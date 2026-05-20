@@ -72,6 +72,24 @@ const store = useStore();
 
 const resolveAttributesModalRef = ref(null);
 
+// Chatcenter custom: inline search in conversation list
+const searchQuery = ref('');
+const debouncedSearchQuery = ref('');
+let searchDebounceTimer = null;
+const onSearchInput = event => {
+  const value = event.target.value;
+  searchQuery.value = value;
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => {
+    debouncedSearchQuery.value = value.trim().toLowerCase();
+  }, 200);
+};
+const clearSearch = () => {
+  searchQuery.value = '';
+  debouncedSearchQuery.value = '';
+  clearTimeout(searchDebounceTimer);
+};
+
 const activeAssigneeTab = ref(wootConstants.ASSIGNEE_TYPE.ME);
 const activeStatus = ref(wootConstants.STATUS_TYPE.OPEN);
 const activeSortBy = ref(wootConstants.SORT_BY_TYPE.LAST_ACTIVITY_AT_DESC);
@@ -341,6 +359,29 @@ const conversationList = computed(() => {
     const { payload } = activeFolder.value.query;
     localConversationList = localConversationList.filter(conversation => {
       return matchesFilters(conversation, payload);
+    });
+  }
+
+  // Chatcenter custom: inline search across contact name and last message
+  if (debouncedSearchQuery.value) {
+    const q = debouncedSearchQuery.value;
+    localConversationList = localConversationList.filter(conversation => {
+      const senderName =
+        conversation?.meta?.sender?.name?.toLowerCase?.() || '';
+      const senderEmail =
+        conversation?.meta?.sender?.email?.toLowerCase?.() || '';
+      const senderPhone =
+        conversation?.meta?.sender?.phone_number?.toLowerCase?.() || '';
+      const messages = conversation?.messages || [];
+      const lastMessage = messages.length
+        ? messages[messages.length - 1]?.content?.toLowerCase?.() || ''
+        : '';
+      return (
+        senderName.includes(q) ||
+        senderEmail.includes(q) ||
+        senderPhone.includes(q) ||
+        lastMessage.includes(q)
+      );
     });
   }
 
@@ -924,6 +965,33 @@ watch(conversationFilters, (newVal, oldVal) => {
       is-compact
       @chat-tab-change="updateAssigneeTab"
     />
+
+    <!-- Chatcenter custom: inline conversation search -->
+    <div
+      class="flex items-center gap-2 mx-3 mt-1 px-2.5 h-8 rounded-md bg-n-alpha-2 focus-within:bg-n-alpha-3 focus-within:ring-1 focus-within:ring-n-brand transition-colors"
+    >
+      <fluent-icon
+        icon="search"
+        size="14"
+        class="text-n-slate-10 flex-shrink-0"
+      />
+      <input
+        :value="searchQuery"
+        type="text"
+        placeholder="Buscar conversas"
+        class="flex-1 bg-transparent border-0 outline-none text-sm text-n-slate-12 placeholder:text-n-slate-10 min-w-0"
+        @input="onSearchInput"
+      />
+      <button
+        v-if="searchQuery"
+        type="button"
+        class="flex-shrink-0 text-n-slate-10 hover:text-n-slate-12 transition-colors"
+        aria-label="Limpar busca"
+        @click="clearSearch"
+      >
+        <fluent-icon icon="dismiss-circle" size="14" />
+      </button>
+    </div>
 
     <p
       v-if="!chatListLoading && !conversationList.length"
