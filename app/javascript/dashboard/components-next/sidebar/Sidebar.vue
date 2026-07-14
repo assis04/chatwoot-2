@@ -346,6 +346,12 @@ const menuItems = computed(() => {
       ],
     },
     {
+      name: 'GroupManagement',
+      label: t('SIDEBAR.GROUP_MANAGEMENT'),
+      icon: 'i-lucide-users-round',
+      to: accountScopedRoute('group_management_index'),
+    },
+    {
       name: 'Captain',
       icon: 'i-woot-captain',
       label: t('SIDEBAR.CAPTAIN'),
