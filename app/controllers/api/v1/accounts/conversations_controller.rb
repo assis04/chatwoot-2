@@ -118,6 +118,10 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     # Always update immediately if there are unread messages to maintain accurate read/unread state.
     # Visiting a conversation should clear any unread inbox notifications for this conversation.
     Notification::MarkConversationReadService.new(user: Current.user, account: Current.account, conversation: @conversation).perform
+
+    # Per-agent read: registra que ESTE agente viu a conversa (independente dos outros).
+    write_read_state_for_current_user(DateTime.now.utc) if Current.user.is_a?(User) && @conversation.unread_count_for(Current.user).positive?
+
     return update_last_seen_on_conversation(DateTime.now.utc, true) if assignee? && @conversation.assignee_unread_messages.any?
     return update_last_seen_on_conversation(DateTime.now.utc, false) if !assignee? && @conversation.unread_messages.any?
 
@@ -131,6 +135,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     last_incoming_message = @conversation.messages.incoming.last
     last_seen_at = last_incoming_message.created_at - 1.second if last_incoming_message.present?
     update_last_seen_on_conversation(last_seen_at, true)
+    write_read_state_for_current_user(last_seen_at)
   end
 
   def custom_attributes
@@ -164,6 +169,26 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     # rubocop:enable Rails/SkipsModelValidations
 
     ::Conversations::UnreadCounts::Notifier.new(@conversation).perform
+  end
+
+  # Per-agent read state: grava o last_seen_at DESTE usuário (Current.user) em
+  # conversation_read_states — base da aba "Não lidas" por agente.
+  def write_read_state_for_current_user(last_seen_at)
+    return unless Current.user.is_a?(User)
+
+    # rubocop:disable Rails/SkipsModelValidations
+    ConversationReadState.upsert(
+      {
+        account_id: @conversation.account_id,
+        conversation_id: @conversation.id,
+        user_id: Current.user.id,
+        last_seen_at: last_seen_at,
+        created_at: Time.current,
+        updated_at: Time.current
+      },
+      unique_by: %i[conversation_id user_id]
+    )
+    # rubocop:enable Rails/SkipsModelValidations
   end
 
   def should_update_last_seen?

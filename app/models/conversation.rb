@@ -110,6 +110,7 @@ class Conversation < ApplicationRecord
   has_many :messages, dependent: :destroy_async, autosave: true
   has_one :csat_survey_response, dependent: :destroy_async
   has_many :conversation_participants, dependent: :destroy_async
+  has_many :conversation_read_states, dependent: :destroy_async
   has_many :notifications, as: :primary_actor, dependent: :destroy_async
   has_many :attachments, through: :messages
   has_many :reporting_events, dependent: :destroy_async
@@ -125,6 +126,19 @@ class Conversation < ApplicationRecord
   after_destroy_commit :notify_conversation_deletion
 
   delegate :auto_resolve_after, to: :account
+
+  # Per-agent unread: uma conversa está "não lida" para um usuário se existe mensagem
+  # recebida (incoming) mais nova que o last_seen_at DELE em conversation_read_states,
+  # ignorando o agent_last_seen_at compartilhado. Sem registro = nunca vista.
+  scope :unread_by_user, lambda { |user|
+    where(
+      'EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = conversations.id ' \
+      'AND m.account_id = conversations.account_id AND m.message_type = :incoming ' \
+      'AND m.created_at > COALESCE((SELECT crs.last_seen_at FROM conversation_read_states crs ' \
+      'WHERE crs.conversation_id = conversations.id AND crs.user_id = :uid), to_timestamp(0)))',
+      incoming: Message.message_types[:incoming], uid: user.id
+    )
+  }
 
   def can_reply?
     Conversations::MessageWindowService.new(self).can_reply?
@@ -176,6 +190,32 @@ class Conversation < ApplicationRecord
 
   def unread_incoming_messages
     unread_messages.where(account_id: account_id).incoming.last(10)
+  end
+
+  # ── Per-agent read state ─────────────────────────────────────────────
+  # last_seen_at DESTE usuário (via conversation_read_states). Usa a associação
+  # pré-carregada quando disponível (evita N+1 na listagem).
+  def read_state_last_seen_at_for(user)
+    return agent_last_seen_at unless user.is_a?(User)
+
+    if conversation_read_states.loaded?
+      conversation_read_states.find { |rs| rs.user_id == user.id }&.last_seen_at
+    else
+      conversation_read_states.find_by(user_id: user.id)&.last_seen_at
+    end
+  end
+
+  def unread_messages_for(user)
+    last_seen = read_state_last_seen_at_for(user)
+    last_seen.present? ? messages.created_since(last_seen) : messages
+  end
+
+  def unread_incoming_messages_for(user)
+    unread_messages_for(user).where(account_id: account_id).incoming.last(10)
+  end
+
+  def unread_count_for(user)
+    unread_incoming_messages_for(user).count
   end
 
   def cached_label_list_array

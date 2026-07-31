@@ -40,7 +40,7 @@ class ConversationFinder
   def perform
     set_up
 
-    mine_count, unassigned_count, all_count, = set_count_for_all_conversations
+    mine_count, unassigned_count, all_count, unread_count = set_count_for_all_conversations
     assigned_count = all_count - unassigned_count
 
     filter_by_assignee_type
@@ -51,7 +51,8 @@ class ConversationFinder
         mine_count: mine_count,
         assigned_count: assigned_count,
         unassigned_count: unassigned_count,
-        all_count: all_count
+        all_count: all_count,
+        unread_count: unread_count
       }
     }
   end
@@ -59,7 +60,7 @@ class ConversationFinder
   def perform_meta_only
     set_up
 
-    mine_count, unassigned_count, all_count, = set_count_for_all_conversations
+    mine_count, unassigned_count, all_count, unread_count = set_count_for_all_conversations
     assigned_count = all_count - unassigned_count
 
     {
@@ -67,7 +68,8 @@ class ConversationFinder
         mine_count: mine_count,
         assigned_count: assigned_count,
         unassigned_count: unassigned_count,
-        all_count: all_count
+        all_count: all_count,
+        unread_count: unread_count
       }
     }
   end
@@ -131,6 +133,9 @@ class ConversationFinder
       @conversations = @conversations.unassigned
     when 'assigned'
       @conversations = @conversations.assigned
+    when 'unread'
+      # Aba "Não lidas": conversas não lidas por ESTE agente, de qualquer atribuição.
+      @conversations = @conversations.unread_by_user(current_user)
     end
     @conversations
   end
@@ -187,7 +192,8 @@ class ConversationFinder
     [
       @conversations.assigned_to(current_user).count,
       @conversations.unassigned.count,
-      @conversations.count
+      @conversations.count,
+      @conversations.unread_by_user(current_user).count
     ]
   end
 
@@ -197,7 +203,8 @@ class ConversationFinder
 
   def conversations_base_query
     @conversations.includes(
-      :taggings, :inbox, { assignee: { avatar_attachment: [:blob] } }, { contact: { avatar_attachment: [:blob] } }, :team, :contact_inbox
+      :taggings, :inbox, :conversation_read_states, { assignee: { avatar_attachment: [:blob] } }, { contact: { avatar_attachment: [:blob] } }, :team,
+      :contact_inbox
     )
   end
 
