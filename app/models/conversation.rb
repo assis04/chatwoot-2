@@ -130,14 +130,17 @@ class Conversation < ApplicationRecord
   # Per-agent unread: uma conversa está "não lida" para um usuário se existe mensagem
   # recebida (incoming) mais nova que o last_seen_at DELE em conversation_read_states,
   # ignorando o agent_last_seen_at compartilhado. Sem registro = nunca vista.
+  # Respeita atribuição: só entra se for SEM DONO ou atribuída AO PRÓPRIO usuário —
+  # conversas atribuídas a outro agente não aparecem na "Não lidas" deste.
   scope :unread_by_user, lambda { |user|
-    where(
-      'EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = conversations.id ' \
-      'AND m.account_id = conversations.account_id AND m.message_type = :incoming ' \
-      'AND m.created_at > COALESCE((SELECT crs.last_seen_at FROM conversation_read_states crs ' \
-      'WHERE crs.conversation_id = conversations.id AND crs.user_id = :uid), to_timestamp(0)))',
-      incoming: Message.message_types[:incoming], uid: user.id
-    )
+    where('conversations.assignee_id IS NULL OR conversations.assignee_id = :uid', uid: user.id)
+      .where(
+        'EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = conversations.id ' \
+        'AND m.account_id = conversations.account_id AND m.message_type = :incoming ' \
+        'AND m.created_at > COALESCE((SELECT crs.last_seen_at FROM conversation_read_states crs ' \
+        'WHERE crs.conversation_id = conversations.id AND crs.user_id = :uid), to_timestamp(0)))',
+        incoming: Message.message_types[:incoming], uid: user.id
+      )
   }
 
   def can_reply?
