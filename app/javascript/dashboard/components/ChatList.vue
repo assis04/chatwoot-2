@@ -321,11 +321,15 @@ const conversationList = computed(() => {
     } else if (activeAssigneeTab.value === 'unassigned') {
       localConversationList = [...unAssignedChatsList.value(filters)];
     } else if (activeAssigneeTab.value === wootConstants.ASSIGNEE_TYPE.UNREAD) {
-      // Aba "Não lidas": unread_count já vem por-agente do servidor, então basta
-      // filtrar as que têm algo não lido POR MIM. Some da lista ao ser lida.
-      localConversationList = allChatList
-        .value(filters)
-        .filter(chat => chat.unread_count > 0);
+      // Aba "Não lidas": unread_count já vem por-agente do servidor. Mostra as não
+      // lidas POR MIM que sejam sem dono OU minhas (espelha o filtro do servidor).
+      // Some ao ser lida ou ao ser atribuída a outro agente.
+      localConversationList = allChatList.value(filters).filter(
+        chat =>
+          chat.unread_count > 0 &&
+          (!chat.meta?.assignee ||
+            chat.meta?.assignee?.id === currentUser.value?.id)
+      );
     } else {
       localConversationList = [...allChatList.value(filters)];
     }
