@@ -24,7 +24,7 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
   def search
     render json: { error: 'Specify search string with parameter q' }, status: :unprocessable_entity if params[:q].blank? && return
 
-    contacts = Current.account.contacts.where(
+    contacts = contact_visibility_scope(Current.account.contacts).where(
       'name ILIKE :search OR email ILIKE :search OR phone_number ILIKE :search OR contacts.identifier LIKE :search',
       search: "%#{params[:q].strip}%"
     )
@@ -51,7 +51,7 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
 
   # returns online contacts
   def active
-    contacts = Current.account.contacts.where(id: ::OnlineStatusTracker
+    contacts = contact_visibility_scope(Current.account.contacts).where(id: ::OnlineStatusTracker
                   .get_available_contact_ids(Current.account.id))
     @contacts = fetch_contacts(contacts)
     @contacts_count = @contacts.total_count
@@ -61,8 +61,8 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
 
   def filter
     result = ::Contacts::FilterService.new(Current.account, Current.user, params.permit!).perform
-    contacts = result[:contacts]
-    @contacts_count = result[:count]
+    contacts = contact_visibility_scope(result[:contacts])
+    @contacts_count = contacts.count
     @contacts = fetch_contacts(contacts)
   rescue CustomExceptions::CustomFilter::InvalidAttribute,
          CustomExceptions::CustomFilter::InvalidOperator,
@@ -85,6 +85,7 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
   def create
     ActiveRecord::Base.transaction do
       @contact = Current.account.contacts.new(permitted_params.except(:avatar_url))
+      assign_owner_inbox_ids(@contact)
       @contact.save!
       @contact_inbox = build_contact_inbox
       process_avatar_from_url
@@ -120,10 +121,38 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
   def resolved_contacts
     return @resolved_contacts if @resolved_contacts
 
-    @resolved_contacts = Current.account.contacts.resolved_contacts(use_crm_v2: Current.account.feature_enabled?('crm_v2'))
+    @resolved_contacts = contact_visibility_scope(
+      Current.account.contacts.resolved_contacts(use_crm_v2: Current.account.feature_enabled?('crm_v2'))
+    )
 
     @resolved_contacts = @resolved_contacts.tagged_with(params[:labels], any: true) if params[:labels].present?
     @resolved_contacts
+  end
+
+  # Fork customization — contact visibility isolation by inbox.
+  # Admins see all; agents see only contacts owned by / linked to their inboxes.
+  def contact_visibility_scope(relation)
+    account_user = ::AccountUser.find_by(account_id: Current.account.id, user_id: Current.user.id)
+    return relation if account_user.nil? || account_user.administrator?
+
+    relation.visible_to_inboxes(agent_visible_inbox_ids)
+  end
+
+  def agent_visible_inbox_ids
+    @agent_visible_inbox_ids ||= Current.user.inboxes.where(account_id: Current.account.id).pluck(:id)
+  end
+
+  # Ensure an agent who creates a contact can still see it under the scope above:
+  # tag it with the target inbox (when provided) or the agent's own inboxes.
+  def assign_owner_inbox_ids(contact)
+    account_user = ::AccountUser.find_by(account_id: Current.account.id, user_id: Current.user.id)
+    return if account_user.nil? || account_user.administrator?
+
+    ids = params[:inbox_id].present? ? [params[:inbox_id].to_s] : agent_visible_inbox_ids.map(&:to_s)
+    return if ids.empty?
+
+    attrs = contact.additional_attributes || {}
+    contact.additional_attributes = attrs.merge('owner_inbox_ids' => (Array(attrs['owner_inbox_ids']) + ids).uniq)
   end
 
   def set_current_page
@@ -201,7 +230,7 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
   end
 
   def fetch_contact
-    contact_scope = Current.account.contacts
+    contact_scope = contact_visibility_scope(Current.account.contacts)
     contact_scope = contact_scope.includes(contact_inboxes: [:inbox]) if @include_contact_inboxes
     @contact = contact_scope.find(params[:id])
   end

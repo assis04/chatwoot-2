@@ -131,6 +131,24 @@ class Contact < ApplicationRecord
     )
   }
 
+  # Contact visibility isolation by inbox (fork customization).
+  # A contact is visible to an agent scoped to `inbox_ids` when it is either:
+  #   (a) "owned" by one of those inboxes — additional_attributes.owner_inbox_ids,
+  #       a JSON array of inbox ids as strings, set by the one-time backfill; or
+  #   (b) linked to one of those inboxes via contact_inbox — which auto-covers
+  #       every contact that ever messages an inbox, so the rule self-maintains.
+  # Administrators bypass this scope entirely (handled in the controller).
+  scope :visible_to_inboxes, lambda { |inbox_ids|
+    inbox_ids = Array(inbox_ids)
+    return none if inbox_ids.empty?
+
+    where(
+      "EXISTS (SELECT 1 FROM jsonb_array_elements_text(COALESCE(contacts.additional_attributes->'owner_inbox_ids', '[]'::jsonb)) AS o(v) WHERE o.v IN (:sids)) " \
+      'OR EXISTS (SELECT 1 FROM contact_inboxes ci WHERE ci.contact_id = contacts.id AND ci.inbox_id IN (:iids))',
+      sids: inbox_ids.map(&:to_s), iids: inbox_ids
+    )
+  }
+
   # Find contacts that:
   # 1. Have no identification (email, phone_number, and identifier are NULL or empty string)
   # 2. Have no conversations
