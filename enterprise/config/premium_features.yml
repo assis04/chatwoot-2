@@ -1,8 +1,12 @@
-# List of the premium features in EE edition
-- disable_branding
-- audit_logs
-- sla
-- custom_roles
-- captain_integration
-- csat_review_notes
-- conversation_required_attributes
+# List of the premium features in EE edition.
+#
+# Neste fork self-hosted a lista foi ESVAZIADA de propósito: o job diário
+# `Internal::ReconcilePlanConfigService` faz `disable_features!(*premium_features)`
+# em todas as contas quando o plano é "community", o que apagava as features que
+# habilitamos manualmente (custom_roles, sla, disable_branding,
+# conversation_required_attributes) toda meia-noite UTC.
+#
+# Com a lista vazia o job continua rodando (versão/config) mas não desliga
+# nenhuma feature — o controle é 100% do operador via enable_features!.
+# NÃO re-adicionar features aqui a menos que queira que o cron as apague.
+--- []
