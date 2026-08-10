@@ -118,6 +118,7 @@ class Conversation < ApplicationRecord
   before_save :ensure_snooze_until_reset
   before_create :determine_conversation_status
   before_create :ensure_waiting_since
+  before_create :assign_default_team_from_inbox
 
   after_update_commit :execute_after_update_commit_callbacks
   after_create_commit :notify_conversation_creation
@@ -285,6 +286,20 @@ class Conversation < ApplicationRecord
 
   def ensure_waiting_since
     self.waiting_since = created_at
+  end
+
+  # Fork customization — Digisac-style routing: a new conversation lands in the
+  # default Team configured for its inbox/number (account.custom_attributes
+  # .inbox_default_teams => { "<inbox_id>" => <team_id> }), so it is immediately
+  # visible to that department's queue. No-op until the mapping is configured.
+  def assign_default_team_from_inbox
+    return if team_id.present?
+
+    mapping = account&.custom_attributes&.dig('inbox_default_teams')
+    return if mapping.blank?
+
+    default_team_id = mapping[inbox_id.to_s]
+    self.team_id = default_team_id if default_team_id.present?
   end
 
   def validate_additional_attributes
