@@ -14,7 +14,10 @@ class ConversationPolicy < ApplicationPolicy
   private
 
   def agent_can_view_conversation?
-    inbox_access? || team_access?
+    # Fork: a conversation transferred to a person (assignee) or that the user
+    # participates in is viewable/answerable even when it lives in an inbox the
+    # user is not a member of — required for Digisac-style cross-number transfer.
+    inbox_access? || team_access? || assigned_to_user? || participant?
   end
 
   def administrator?
