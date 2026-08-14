@@ -1,4 +1,6 @@
 class Api::V1::Accounts::Contacts::CallsController < Api::V1::Accounts::BaseController
+  include ContactVisibilityScopable
+
   before_action :contact
   before_action :voice_inbox
 
@@ -25,7 +27,7 @@ class Api::V1::Accounts::Contacts::CallsController < Api::V1::Accounts::BaseCont
   private
 
   def contact
-    @contact ||= Current.account.contacts.find(params[:id])
+    @contact ||= contact_visibility_scope(Current.account.contacts).find(params[:id])
   end
 
   def voice_inbox

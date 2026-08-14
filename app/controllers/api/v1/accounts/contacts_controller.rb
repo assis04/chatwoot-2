@@ -1,5 +1,6 @@
 class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
   include Sift
+  include ContactVisibilityScopable
   sort_on :email, type: :string
   sort_on :name, internal_name: :order_on_name, type: :scope, scope_params: [:direction]
   sort_on :phone_number, type: :string
@@ -129,18 +130,8 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
     @resolved_contacts
   end
 
-  # Fork customization — contact visibility isolation by inbox.
-  # Admins see all; agents see only contacts owned by / linked to their inboxes.
-  def contact_visibility_scope(relation)
-    account_user = ::AccountUser.find_by(account_id: Current.account.id, user_id: Current.user.id)
-    return relation if account_user.nil? || account_user.administrator?
-
-    relation.visible_to_inboxes(agent_visible_inbox_ids)
-  end
-
-  def agent_visible_inbox_ids
-    @agent_visible_inbox_ids ||= Current.user.inboxes.where(account_id: Current.account.id).pluck(:id)
-  end
+  # contact_visibility_scope / agent_visible_inbox_ids provided by
+  # ContactVisibilityScopable (shared with other contact-reading controllers).
 
   # Ensure an agent who creates a contact can still see it under the scope above:
   # tag it with the target inbox (when provided) or the agent's own inboxes.

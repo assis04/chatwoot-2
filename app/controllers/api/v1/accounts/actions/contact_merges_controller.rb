@@ -1,4 +1,6 @@
 class Api::V1::Accounts::Actions::ContactMergesController < Api::V1::Accounts::BaseController
+  include ContactVisibilityScopable
+
   before_action :set_base_contact, only: [:create]
   before_action :set_mergee_contact, only: [:create]
 
@@ -22,6 +24,7 @@ class Api::V1::Accounts::Actions::ContactMergesController < Api::V1::Accounts::B
   end
 
   def contacts
-    @contacts ||= Current.account.contacts
+    # Scoped: a non-admin agent can only merge contacts they are allowed to see.
+    @contacts ||= contact_visibility_scope(Current.account.contacts)
   end
 end
