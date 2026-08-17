@@ -33,7 +33,13 @@ module Enterprise::Account
 
   # Auto-sync advanced_assignment with assignment_v2 when features are bulk-updated via admin UI
   def selected_feature_flags=(features)
-    super(Array(features).map(&:to_sym) | ALWAYS_ON_FEATURES.map(&:to_sym))
+    super
+    # Re-inject our always-on premium via Featurable#enable_features (the
+    # per-flag `feature_x=` path). The gem's bulk setter above rejects these
+    # with `Invalid flag` (they are premium flags the Super Admin form does not
+    # render), so we must NOT route them through super. In-memory only — the
+    # controller's save persists them together with the form's selection.
+    enable_features(*ALWAYS_ON_FEATURES)
     sync_assignment_features
   end
 
