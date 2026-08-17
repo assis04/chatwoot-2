@@ -22,9 +22,18 @@ module Enterprise::Account
   # this is a temporary method since current administrate doesn't support virtual attributes
   def manually_managed_features; end
 
+  # Fork customization — features premium que a Valcenter mantém sempre ligadas.
+  # Salvar a conta no Super Admin faz `selected_feature_flags = (só as marcadas
+  # no form)`, o que derrubava as premium. Forçamos elas de volta em todo set,
+  # então nenhum save do Super Admin (nem criação de conta) consegue desligá-las.
+  # Pareado com o premium_features.yml vazio, que neutraliza o cron noturno.
+  ALWAYS_ON_FEATURES = %w[
+    custom_roles sla disable_branding companies conversation_required_attributes
+  ].freeze
+
   # Auto-sync advanced_assignment with assignment_v2 when features are bulk-updated via admin UI
   def selected_feature_flags=(features)
-    super
+    super(Array(features).map(&:to_sym) | ALWAYS_ON_FEATURES.map(&:to_sym))
     sync_assignment_features
   end
 
