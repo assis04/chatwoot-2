@@ -966,9 +966,9 @@ watch(conversationFilters, (newVal, oldVal) => {
       @chat-tab-change="updateAssigneeTab"
     />
 
-    <!-- Chatcenter custom: inline conversation search -->
+    <!-- Chatcenter custom: inline conversation search (underline minimalista) -->
     <div
-      class="flex items-center gap-2 mx-3 mt-1 px-2.5 h-8 rounded-md bg-n-alpha-2 focus-within:bg-n-alpha-3 focus-within:ring-1 focus-within:ring-n-brand transition-colors"
+      class="flex items-center gap-2 mx-3 mt-1 px-1 h-8 border-b border-n-weak focus-within:border-n-brand transition-colors"
     >
       <fluent-icon
         icon="search"
