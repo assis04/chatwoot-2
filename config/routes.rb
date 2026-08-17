@@ -289,6 +289,12 @@ Rails.application.routes.draw do
           end
           resource :notification_settings, only: [:show, :update]
 
+          # Fork customization — issues the signed scope token for the external
+          # Group Management app (/ext). See GroupManagement::ContextTokenService.
+          resource :group_management, only: [], controller: 'group_management' do
+            get :context_token
+          end
+
           resources :teams do
             resources :team_members, only: [:index, :create] do
               collection do
