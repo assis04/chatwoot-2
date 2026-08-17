@@ -2,7 +2,6 @@
 import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
-import axios from 'axios';
 
 // URL of the external Group Management app, reverse-proxied by nginx on the same
 // origin. We append a short-lived, signed context token (`ctx`) so the app knows
@@ -20,7 +19,9 @@ const failed = ref(false);
 onMounted(async () => {
   try {
     const { accountId } = route.params;
-    const { data } = await axios.get(
+    // window.axios is Chatwoot's configured instance (auth headers from the
+    // session cookie). The bare `axios` module default is NOT authenticated.
+    const { data } = await window.axios.get(
       `/api/v1/accounts/${accountId}/group_management/context_token`
     );
     iframeSrc.value = `${GROUP_APP_URL}?ctx=${encodeURIComponent(data.token)}`;
