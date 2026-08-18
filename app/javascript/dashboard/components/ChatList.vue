@@ -968,7 +968,7 @@ watch(conversationFilters, (newVal, oldVal) => {
 
     <!-- Chatcenter custom: inline conversation search (underline minimalista) -->
     <div
-      class="flex items-center gap-2 mx-3 my-2 px-1 h-8 border-b border-n-weak focus-within:border-n-brand transition-colors"
+      class="flex items-center gap-2 mx-3 my-5 px-1 h-8 border-b border-n-weak focus-within:border-n-brand transition-colors"
     >
       <fluent-icon
         icon="search"
