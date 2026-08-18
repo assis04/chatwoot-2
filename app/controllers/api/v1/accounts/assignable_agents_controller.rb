@@ -2,14 +2,17 @@ class Api::V1::Accounts::AssignableAgentsController < Api::V1::Accounts::BaseCon
   before_action :fetch_inboxes
 
   def index
+    # TODO: Remove this opt-in once mobile clients support AgentBot assignees in this payload.
+    @include_agent_bots = params[:include_agent_bots].present?
+
     # Fork: when the account uses Digisac-style transfer, any agent can transfer
     # a conversation to anyone, so offer every agent + admin regardless of inbox
     # membership. Otherwise keep the default (inbox members + admins).
     if Current.account.custom_attributes.is_a?(Hash) && Current.account.custom_attributes['department_visibility_enabled']
       @assignable_agents = Current.account.users.to_a
+      @agent_bots = @include_agent_bots ? AgentBot.accessible_to(Current.account) : []
       return
     end
-
     agent_ids = @inboxes.map do |inbox|
       authorize inbox, :show?
       member_ids = inbox.members.pluck(:user_id)
@@ -18,6 +21,7 @@ class Api::V1::Accounts::AssignableAgentsController < Api::V1::Accounts::BaseCon
     agent_ids = agent_ids.inject(:&)
     agents = Current.account.users.where(id: agent_ids)
     @assignable_agents = (agents + Current.account.administrators).uniq
+    @agent_bots = @include_agent_bots ? AgentBot.accessible_to(Current.account) : []
   end
 
   private
