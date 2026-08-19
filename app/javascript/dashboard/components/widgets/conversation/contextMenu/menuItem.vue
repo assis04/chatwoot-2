@@ -50,7 +50,7 @@ defineProps({
       {{ option.label }}
     </p>
     <Icon
-      v-if="variant === 'label-assigned'"
+      v-if="variant === 'label-assigned' || option.checked"
       icon="i-lucide-check"
       class="flex-shrink-0 size-3.5 text-n-brand group-hover:text-white"
     />

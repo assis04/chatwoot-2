@@ -23,6 +23,7 @@ const MENU = {
   SNOOZE: 'snooze',
   AGENT: 'agent',
   TEAM: 'team',
+  PARTICIPANTS: 'participants',
   LABEL: 'label',
   DELETE: 'delete',
   OPEN_NEW_TAB: 'open-new-tab',
@@ -70,6 +71,10 @@ export default {
       type: Array,
       default: () => [],
     },
+    participantIds: {
+      type: Array,
+      default: () => [],
+    },
   },
   emits: [
     'updateConversation',
@@ -78,6 +83,7 @@ export default {
     'markAsRead',
     'assignAgent',
     'assignTeam',
+    'toggleParticipant',
     'assignLabel',
     'removeLabel',
     'deleteConversation',
@@ -165,6 +171,12 @@ export default {
         key: MENU.TEAM,
         icon: 'people-team-add',
         label: this.$t('CONVERSATION.CARD_CONTEXT_MENU.ASSIGN_TEAM'),
+      },
+      participantMenuConfig: {
+        key: MENU.PARTICIPANTS,
+        icon: 'people-team',
+        // Fork: adiciona/remove participantes direto do menu de contexto.
+        label: 'Participantes',
       },
       deleteOption: {
         key: MENU.DELETE,
@@ -331,7 +343,15 @@ export default {
       <hr class="m-1 rounded border-b border-n-weak dark:border-n-weak" />
     </template>
     <template
-      v-if="isAllowed([MENU.PRIORITY, MENU.LABEL, MENU.AGENT, MENU.TEAM])"
+      v-if="
+        isAllowed([
+          MENU.PRIORITY,
+          MENU.LABEL,
+          MENU.AGENT,
+          MENU.TEAM,
+          MENU.PARTICIPANTS,
+        ])
+      "
     >
       <MenuItemWithSubmenu
         v-if="isAllowed([MENU.PRIORITY])"
@@ -406,6 +426,25 @@ export default {
             :option="generateMenuLabelConfig(agent, 'agent')"
             variant="agent"
             @click.stop="$emit('assignAgent', agent)"
+          />
+        </template>
+      </MenuItemWithSubmenu>
+      <MenuItemWithSubmenu
+        v-if="isAllowed([MENU.PARTICIPANTS])"
+        :option="participantMenuConfig"
+        :sub-menu-available="!!filteredAgentOnAvailability.length"
+      >
+        <AgentLoadingPlaceholder v-if="assignableAgentsUiFlags.isFetching" />
+        <template v-else>
+          <MenuItem
+            v-for="agent in filteredAgentOnAvailability"
+            :key="agent.id"
+            :option="{
+              ...generateMenuLabelConfig(agent, 'agent'),
+              checked: participantIds.includes(agent.id),
+            }"
+            variant="agent"
+            @click.stop="$emit('toggleParticipant', agent)"
           />
         </template>
       </MenuItemWithSubmenu>

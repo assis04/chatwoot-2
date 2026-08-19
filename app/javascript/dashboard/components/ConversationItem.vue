@@ -77,6 +77,16 @@ const inbox = computed(() => {
   return store.getters['inboxes/getInbox'](inboxId) || { id: inboxId };
 });
 
+// Fork: participantes (watchers) atuais da conversa, pra marcar no submenu
+// "Participantes" do menu de contexto.
+const participantIds = computed(() => {
+  const list =
+    store.getters['conversationWatchers/getByConversationId'](
+      props.source.id
+    ) || [];
+  return list.map(user => user.id);
+});
+
 const showInboxName = computed(
   () => !activeInbox.value && inboxesList.value.length > 1
 );
@@ -131,6 +141,11 @@ const openContextMenu = e => {
   contextMenu.value.x = e.pageX || e.clientX;
   contextMenu.value.y = e.pageY || e.clientY;
   showContextMenu.value = true;
+  // Fork: carrega os participantes atuais pra o submenu "Participantes" já vir
+  // com os que estão marcados.
+  store.dispatch('conversationWatchers/show', {
+    conversationId: props.source.id,
+  });
 };
 
 const closeContextMenu = () => {
@@ -181,6 +196,29 @@ const onAssignPriority = priority => {
 const onDeleteConversation = () => {
   deleteConversation(props.source.id);
   closeContextMenu();
+};
+
+// Fork: adiciona/remove um agente como participante (watcher) da conversa.
+// Não fecha o menu — permite marcar/desmarcar vários de uma vez.
+const onToggleParticipant = agent => {
+  const current =
+    store.getters['conversationWatchers/getByConversationId'](
+      props.source.id
+    ) || [];
+  const isParticipant = current.some(user => user.id === agent.id);
+  const userIds = isParticipant
+    ? current.filter(user => user.id !== agent.id).map(user => user.id)
+    : [...current.map(user => user.id), agent.id];
+  store
+    .dispatch('conversationWatchers/update', {
+      conversationId: props.source.id,
+      userIds,
+    })
+    .then(() =>
+      store.dispatch('conversationWatchers/show', {
+        conversationId: props.source.id,
+      })
+    );
 };
 </script>
 
@@ -235,11 +273,13 @@ const onDeleteConversation = () => {
       :has-unread-messages="source.unread_count > 0"
       :conversation-labels="source.labels"
       :conversation-url="conversationPath"
+      :participant-ids="participantIds"
       @update-conversation="onUpdateConversation"
       @assign-agent="onAssignAgent"
       @assign-label="onAssignLabel"
       @remove-label="onRemoveLabel"
       @assign-team="onAssignTeam"
+      @toggle-participant="onToggleParticipant"
       @mark-as-unread="onMarkAsUnread"
       @mark-as-read="onMarkAsRead"
       @assign-priority="onAssignPriority"
