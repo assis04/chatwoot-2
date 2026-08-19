@@ -68,7 +68,13 @@ const isActiveChat = computed(() => currentChat.value.id === props.source.id);
 
 const inbox = computed(() => {
   const inboxId = props.source.inbox_id;
-  return inboxId ? store.getters['inboxes/getInbox'](inboxId) : {};
+  if (!inboxId) return {};
+  // Fork: com a visibilidade cross-número (Digisac), um agente vê conversas de
+  // inboxes das quais NÃO é membro, então a inbox pode não estar no store local
+  // dele. Caímos num objeto mínimo com o id pra o menu de contexto / atribuição
+  // (que dependem do inbox_id) continuarem funcionando — senão o dropdown de
+  // agentes vem vazio ("None") nessas conversas.
+  return store.getters['inboxes/getInbox'](inboxId) || { id: inboxId };
 });
 
 const showInboxName = computed(
