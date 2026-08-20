@@ -204,13 +204,14 @@ watch(
               :key="participant.id"
               :name="participant.name"
               :src="participant.thumbnail"
-              :size="16"
+              :size="20"
+              rounded-full
               class="rounded-full ring-1 ring-n-background"
             />
             <span
               v-if="extraParticipantCount"
-              class="flex items-center justify-center rounded-full ring-1 ring-n-background bg-n-slate-3 text-n-slate-11 text-[9px] font-medium leading-none"
-              style="width: 16px; height: 16px"
+              class="flex items-center justify-center rounded-full ring-1 ring-n-background bg-n-slate-3 text-n-slate-11 text-[10px] font-medium leading-none"
+              style="width: 20px; height: 20px"
             >
               +{{ extraParticipantCount }}
             </span>
