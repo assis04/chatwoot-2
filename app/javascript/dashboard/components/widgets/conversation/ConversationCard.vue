@@ -50,11 +50,31 @@ const voiceCallData = computed(() => {
   };
 });
 
+// Fork (Participantes — fase 2): empilhado de avatares dos participantes
+// (watchers) da conversa no card. O responsável já aparece como assignee, então
+// o filtramos daqui pra não duplicar. Vem slim de `chat.meta.participants`.
+const MAX_PARTICIPANT_AVATARS = 3;
+const participants = computed(() => {
+  const list = props.chat.meta?.participants ?? [];
+  const assigneeId = props.assignee?.id;
+  return assigneeId ? list.filter(p => p.id !== assigneeId) : list;
+});
+const visibleParticipants = computed(() =>
+  participants.value.slice(0, MAX_PARTICIPANT_AVATARS)
+);
+const extraParticipantCount = computed(() =>
+  Math.max(0, participants.value.length - MAX_PARTICIPANT_AVATARS)
+);
+const participantNames = computed(() =>
+  participants.value.map(p => p.name).join(', ')
+);
+
 const showMetaSection = computed(() => {
   return (
     props.showInboxName ||
     (props.showAssignee && props.assignee.name) ||
-    props.chat.priority
+    props.chat.priority ||
+    participants.value.length > 0
   );
 });
 
@@ -174,6 +194,27 @@ watch(
             />
             <span class="truncate">{{ assignee.name }}</span>
           </span>
+          <div
+            v-if="participants.length"
+            class="flex items-center flex-shrink-0 self-center -space-x-1.5"
+            :title="participantNames"
+          >
+            <Avatar
+              v-for="participant in visibleParticipants"
+              :key="participant.id"
+              :name="participant.name"
+              :src="participant.thumbnail"
+              :size="16"
+              class="rounded-full ring-1 ring-n-background"
+            />
+            <span
+              v-if="extraParticipantCount"
+              class="flex items-center justify-center rounded-full ring-1 ring-n-background bg-n-slate-3 text-n-slate-11 text-[9px] font-medium leading-none"
+              style="width: 16px; height: 16px"
+            >
+              +{{ extraParticipantCount }}
+            </span>
+          </div>
           <CardPriorityIcon
             :priority="chat.priority"
             class="flex-shrink-0 !size-3.5"

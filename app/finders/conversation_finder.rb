@@ -218,7 +218,7 @@ class ConversationFinder
   def conversations_base_query
     @conversations.includes(
       :taggings, :inbox, :conversation_read_states, { assignee: { avatar_attachment: [:blob] } }, { contact: { avatar_attachment: [:blob] } }, :team,
-      :contact_inbox
+      :contact_inbox, { conversation_participants: { user: { avatar_attachment: [:blob] } } }
     )
   end
 

@@ -45,8 +45,19 @@ class Conversations::EventDataPresenter < SimpleDelegator
       assignee: assigned_entity&.push_event_data,
       assignee_type: assignee_type,
       team: team&.push_event_data,
+      participants: push_participants,
       hmac_verified: contact_inbox&.hmac_verified
     }
+  end
+
+  # Fork (Participantes — fase 2): participantes (watchers) no payload de evento
+  # pra o empilhado de avatares do card sobreviver a updates em tempo real (o
+  # UPDATE_CONVERSATION do front substitui o meta inteiro). Shape slim, igual ao
+  # do serializer da lista.
+  def push_participants
+    conversation_participants.includes(:user).map do |participant|
+      { id: participant.user_id, name: participant.user.name, thumbnail: participant.user.avatar_url }
+    end
   end
 
   def push_timestamps

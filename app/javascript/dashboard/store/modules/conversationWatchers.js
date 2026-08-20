@@ -108,6 +108,22 @@ export const actions = {
         conversationId,
         data: response.data,
       });
+      // Fork (Participantes — fase 2): espelha os participantes no meta da
+      // conversa pra o empilhado de avatares do card atualizar na hora (o
+      // backend não emite conversation.updated ao mudar participante). Shape
+      // slim, igual ao do serializer da lista.
+      commit(
+        'conversations/UPDATE_CONVERSATION_PARTICIPANTS',
+        {
+          conversationId,
+          participants: (response.data || []).map(user => ({
+            id: user.id,
+            name: user.name,
+            thumbnail: user.thumbnail,
+          })),
+        },
+        { root: true }
+      );
       if (shouldRefreshUnreadCounts) {
         refreshConversationUnreadCounts(dispatch);
       }

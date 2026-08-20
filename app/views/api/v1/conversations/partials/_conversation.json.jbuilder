@@ -23,6 +23,15 @@ json.meta do
       json.partial! 'api/v1/models/team', formats: [:json], resource: conversation.team
     end
   end
+  # Fork: participantes (watchers) da conversa — usados pra desenhar o empilhado
+  # de avatares no card da lista (quem colabora, além do responsável). Shape slim
+  # de propósito (id/name/thumbnail): evita puxar role/availability por membro em
+  # cada conversa da página. O preload está no ConversationFinder (sem N+1).
+  json.participants conversation.conversation_participants.map(&:user).uniq do |participant|
+    json.id participant.id
+    json.name participant.name
+    json.thumbnail participant.avatar_url
+  end
   json.hmac_verified conversation.contact_inbox&.hmac_verified
 end
 

@@ -308,6 +308,18 @@ export const mutations = {
     }
   },
 
+  // Fork (Participantes — fase 2): mantém o empilhado de avatares do card em
+  // sincronia imediata quando um participante é adicionado/removido. O backend
+  // não re-emite conversation.updated nesse caso, então o store de watchers
+  // dispara isso (ponto único: conversationWatchers/update).
+  [types.UPDATE_CONVERSATION_PARTICIPANTS](_state, { conversationId, participants }) {
+    const chat = getConversationById(_state)(conversationId);
+    if (chat) {
+      if (!chat.meta) chat.meta = {};
+      chat.meta.participants = participants;
+    }
+  },
+
   [types.UPDATE_MESSAGE_CALL_STATUS](
     _state,
     { conversationId, callStatus, callSid }
