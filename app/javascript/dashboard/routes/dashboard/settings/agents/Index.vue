@@ -1,5 +1,6 @@
 <script setup>
 import { useAlert } from 'dashboard/composables';
+import { useAdmin } from 'dashboard/composables/useAdmin';
 import { computed, onMounted, ref } from 'vue';
 import Avatar from 'next/avatar/Avatar.vue';
 import { useI18n } from 'vue-i18n';
@@ -49,6 +50,7 @@ const filteredAgentList = computed(() => {
 const uiFlags = computed(() => getters['agents/getUIFlags'].value);
 const currentUserId = computed(() => getters.getCurrentUserID.value);
 const customRoles = useMapGetter('customRole/getCustomRoles');
+const { isAdmin } = useAdmin();
 
 onMounted(() => {
   store.dispatch('agents/get');
@@ -80,12 +82,21 @@ const verifiedAdministrators = computed(() => {
   );
 });
 
+// Fork Valcenter: um gestor 'agent_manage' (não-admin) não mexe em ADMINISTRADORES
+// — nem editar nem apagar. O backend já bloqueia; aqui a gente esconde os botões
+// pra ele nem tentar.
+const canManageAdmins = agent => isAdmin.value || agent.role !== 'administrator';
+
 const showEditAction = agent => {
-  return currentUserId.value !== agent.id;
+  return currentUserId.value !== agent.id && canManageAdmins(agent);
 };
 
 const showDeleteAction = agent => {
   if (currentUserId.value === agent.id) {
+    return false;
+  }
+
+  if (!canManageAdmins(agent)) {
     return false;
   }
 
