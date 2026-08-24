@@ -68,9 +68,10 @@ class Api::V1::Accounts::AgentsController < Api::V1::Accounts::BaseController
     restrict_non_admin_custom_role_assignment
   end
 
-  # Delegação sem expansão de privilégio: um não-admin só pode atribuir uma custom
-  # role (a) da PRÓPRIA conta (barra cross-tenant) e (b) cujas permissões sejam
-  # SUBCONJUNTO das dele — nunca conceder acesso que ele mesmo não possui.
+  # Escopo (modelo RH/onboarding): um não-admin com 'agent_manage' pode atribuir
+  # QUALQUER função personalizada da conta — nunca Administrador (custom role não
+  # contém 'administrator' por construção, então toda role da conta é não-privilegiada).
+  # Única barra aqui: a role tem que ser da PRÓPRIA conta (anti cross-tenant).
   # Limpar a role (custom_role_id vazio) é downgrade, sempre permitido.
   def restrict_non_admin_custom_role_assignment
     return unless params.key?(:custom_role_id)
@@ -78,11 +79,7 @@ class Api::V1::Accounts::AgentsController < Api::V1::Accounts::BaseController
     requested_custom_role_id = params[:custom_role_id].presence
     return if requested_custom_role_id.nil?
 
-    custom_role = Current.account.custom_roles.find_by(id: requested_custom_role_id)
-    raise Pundit::NotAuthorizedError if custom_role.nil?
-
-    escalated_permissions = custom_role.permissions - Current.account_user.permissions
-    raise Pundit::NotAuthorizedError if escalated_permissions.any?
+    raise Pundit::NotAuthorizedError unless Current.account.custom_roles.exists?(id: requested_custom_role_id)
   end
 
   def fetch_agent

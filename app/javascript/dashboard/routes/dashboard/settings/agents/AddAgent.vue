@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { useAlert } from 'dashboard/composables';
 import { useVuelidate } from '@vuelidate/core';
 import { required, email } from '@vuelidate/validators';
+import { useAdmin } from 'dashboard/composables/useAdmin';
 import Button from 'dashboard/components-next/button/Button.vue';
 
 const emit = defineEmits(['close']);
@@ -30,14 +31,21 @@ const v$ = useVuelidate(rules, {
 
 const uiFlags = useMapGetter('agents/getUIFlags');
 const getCustomRoles = useMapGetter('customRole/getCustomRoles');
+const { isAdmin } = useAdmin();
 
 const roles = computed(() => {
+  // Só administrador pode atribuir a função Administrador; um gestor 'agent_manage'
+  // não vê essa opção (e o backend também bloqueia).
   const defaultRoles = [
-    {
-      id: 'administrator',
-      name: 'administrator',
-      label: t('AGENT_MGMT.AGENT_TYPES.ADMINISTRATOR'),
-    },
+    ...(isAdmin.value
+      ? [
+          {
+            id: 'administrator',
+            name: 'administrator',
+            label: t('AGENT_MGMT.AGENT_TYPES.ADMINISTRATOR'),
+          },
+        ]
+      : []),
     {
       id: 'agent',
       name: 'agent',

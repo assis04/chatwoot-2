@@ -74,8 +74,8 @@ RSpec.describe 'Agents API', type: :request do
     end
   end
 
-  # Fork Valcenter: custom role 'agent_manage' — pode gerenciar AGENTES, nunca
-  # ADMINISTRADORES, e não pode delegar permissões que ele mesmo não possui.
+  # Fork Valcenter: custom role 'agent_manage' — pode gerenciar AGENTES e atribuir
+  # QUALQUER função da conta, nunca ADMINISTRADOR (modelo RH/onboarding).
   describe 'custom role agent_manage' do
     let(:agent_manage_role) { create(:custom_role, account: account, permissions: ['agent_manage']) }
     let(:manager) { create(:user, account: account, role: :agent) }
@@ -111,27 +111,15 @@ RSpec.describe 'Agents API', type: :request do
         expect(User.from_email(email)).to be_nil
       end
 
-      it 'allows assigning a custom role whose permissions are a subset of its own' do
-        subset_role = create(:custom_role, account: account, permissions: ['agent_manage'])
-        email = "sub-#{SecureRandom.hex(4)}@example.com"
+      it 'allows assigning any account custom role, even one more powerful than its own' do
+        powerful_role = create(:custom_role, account: account, permissions: ['report_manage'])
+        email = "role-#{SecureRandom.hex(4)}@example.com"
 
         post "/api/v1/accounts/#{account.id}/agents",
-             params: { name: 'Sub', email: email, custom_role_id: subset_role.id }, headers: manager_headers, as: :json
+             params: { name: 'Role', email: email, custom_role_id: powerful_role.id }, headers: manager_headers, as: :json
 
         expect(response).to have_http_status(:success)
-        expect(account.account_users.find_by(user_id: User.from_email(email).id).custom_role_id).to eq(subset_role.id)
-      end
-
-      it 'forbids assigning a custom role that grants permissions it does not have' do
-        powerful_role = create(:custom_role, account: account, permissions: ['report_manage'])
-        email = "esc-#{SecureRandom.hex(4)}@example.com"
-
-        expect do
-          post "/api/v1/accounts/#{account.id}/agents",
-               params: { name: 'Esc', email: email, custom_role_id: powerful_role.id }, headers: manager_headers, as: :json
-        end.not_to change(User, :count)
-
-        expect(response).to have_http_status(:unauthorized)
+        expect(account.account_users.find_by(user_id: User.from_email(email).id).custom_role_id).to eq(powerful_role.id)
       end
 
       it 'forbids assigning a custom role from another account (cross-tenant)' do
@@ -166,14 +154,35 @@ RSpec.describe 'Agents API', type: :request do
         expect(target_admin.reload.name).not_to eq('Hacked')
       end
 
-      it 'forbids self-assigning a more powerful custom role' do
+      it 'allows assigning any account custom role to an existing agent' do
+        target = create(:user, account: account, role: :agent)
         powerful_role = create(:custom_role, account: account, permissions: ['conversation_manage'])
 
-        patch "/api/v1/accounts/#{account.id}/agents/#{manager.id}",
+        patch "/api/v1/accounts/#{account.id}/agents/#{target.id}",
               params: { custom_role_id: powerful_role.id }, headers: manager_headers, as: :json
 
+        expect(response).to have_http_status(:success)
+        expect(account.account_users.find_by(user_id: target.id).custom_role_id).to eq(powerful_role.id)
+      end
+
+      it 'forbids assigning a custom role from another account (cross-tenant)' do
+        target = create(:user, account: account, role: :agent)
+        foreign_role = create(:custom_role, account: create(:account), permissions: ['agent_manage'])
+
+        patch "/api/v1/accounts/#{account.id}/agents/#{target.id}",
+              params: { custom_role_id: foreign_role.id }, headers: manager_headers, as: :json
+
         expect(response).to have_http_status(:unauthorized)
-        expect(account.account_users.find_by(user_id: manager.id).custom_role_id).to eq(agent_manage_role.id)
+      end
+    end
+
+    describe 'GET /api/v1/accounts/{account.id}/custom_roles' do
+      it 'allows an agent_manage user to list custom roles (to assign them)' do
+        create(:custom_role, account: account, permissions: ['conversation_manage'])
+
+        get "/api/v1/accounts/#{account.id}/custom_roles", headers: manager_headers, as: :json
+
+        expect(response).to have_http_status(:success)
       end
     end
 
