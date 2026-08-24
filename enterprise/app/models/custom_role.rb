@@ -23,6 +23,9 @@
 # - 'contact_manage': Can manage contacts.
 # - 'report_manage': Can manage reports.
 # - 'knowledge_base_manage': Can manage knowledge base portals.
+# - 'agent_manage': (Fork Valcenter) Can create, update and remove AGENTS (never
+#   administrators, and cannot grant the administrator role — enforced in the
+#   AgentsController). Lets a non-admin onboard the team without full admin.
 
 class CustomRole < ApplicationRecord
   belongs_to :account
@@ -39,6 +42,7 @@ class CustomRole < ApplicationRecord
     contact_manage
     report_manage
     knowledge_base_manage
+    agent_manage
   ].freeze
 
   validates :name, presence: true

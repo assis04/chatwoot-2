@@ -1,6 +1,7 @@
 class Api::V1::Accounts::AgentsController < Api::V1::Accounts::BaseController
   before_action :fetch_agent, except: [:create, :index, :bulk_create]
   before_action :check_authorization
+  before_action :restrict_non_admin_agent_management, only: [:create, :update, :destroy]
 
   def index
     @agents = agents
@@ -49,6 +50,39 @@ class Api::V1::Accounts::AgentsController < Api::V1::Accounts::BaseController
 
   def check_authorization
     super(User)
+  end
+
+  # Fork Valcenter: a policy libera as ações de agente pra quem tem 'agent_manage'
+  # (custom role), mas esse perfil só pode gerenciar AGENTES — nunca criar/promover
+  # nem mexer em ADMINISTRADORES (isso seria escalonamento de privilégio). Admin de
+  # verdade passa direto.
+  def restrict_non_admin_agent_management
+    return if Current.account_user.administrator?
+
+    requested_role = params.dig(:agent, :role).presence
+    raise Pundit::NotAuthorizedError if requested_role && requested_role.to_s != 'agent'
+
+    target_account_user = @agent&.account_users&.find_by(account_id: Current.account.id)
+    raise Pundit::NotAuthorizedError if target_account_user&.administrator?
+
+    restrict_non_admin_custom_role_assignment
+  end
+
+  # Delegação sem expansão de privilégio: um não-admin só pode atribuir uma custom
+  # role (a) da PRÓPRIA conta (barra cross-tenant) e (b) cujas permissões sejam
+  # SUBCONJUNTO das dele — nunca conceder acesso que ele mesmo não possui.
+  # Limpar a role (custom_role_id vazio) é downgrade, sempre permitido.
+  def restrict_non_admin_custom_role_assignment
+    return unless params.key?(:custom_role_id)
+
+    requested_custom_role_id = params[:custom_role_id].presence
+    return if requested_custom_role_id.nil?
+
+    custom_role = Current.account.custom_roles.find_by(id: requested_custom_role_id)
+    raise Pundit::NotAuthorizedError if custom_role.nil?
+
+    escalated_permissions = custom_role.permissions - Current.account_user.permissions
+    raise Pundit::NotAuthorizedError if escalated_permissions.any?
   end
 
   def fetch_agent

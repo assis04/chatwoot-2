@@ -73,4 +73,128 @@ RSpec.describe 'Agents API', type: :request do
       end
     end
   end
+
+  # Fork Valcenter: custom role 'agent_manage' — pode gerenciar AGENTES, nunca
+  # ADMINISTRADORES, e não pode delegar permissões que ele mesmo não possui.
+  describe 'custom role agent_manage' do
+    let(:agent_manage_role) { create(:custom_role, account: account, permissions: ['agent_manage']) }
+    let(:manager) { create(:user, account: account, role: :agent) }
+    let(:manager_headers) { manager.create_new_auth_token }
+
+    before do
+      account.update!(limits: { agents: 100 })
+      account.account_users.find_by(user_id: manager.id).update!(custom_role: agent_manage_role)
+    end
+
+    describe 'POST /api/v1/accounts/{account.id}/agents' do
+      it 'allows creating a plain agent' do
+        email = "new-#{SecureRandom.hex(4)}@example.com"
+
+        expect do
+          post "/api/v1/accounts/#{account.id}/agents",
+               params: { name: 'New Agent', email: email, role: :agent }, headers: manager_headers, as: :json
+        end.to change(User, :count).by(1)
+
+        expect(response).to have_http_status(:success)
+        expect(account.account_users.find_by(user_id: User.from_email(email).id).role).to eq('agent')
+      end
+
+      it 'forbids creating an administrator (privilege escalation)' do
+        email = "admin-#{SecureRandom.hex(4)}@example.com"
+
+        expect do
+          post "/api/v1/accounts/#{account.id}/agents",
+               params: { name: 'Hax', email: email, role: :administrator }, headers: manager_headers, as: :json
+        end.not_to change(User, :count)
+
+        expect(response).to have_http_status(:unauthorized)
+        expect(User.from_email(email)).to be_nil
+      end
+
+      it 'allows assigning a custom role whose permissions are a subset of its own' do
+        subset_role = create(:custom_role, account: account, permissions: ['agent_manage'])
+        email = "sub-#{SecureRandom.hex(4)}@example.com"
+
+        post "/api/v1/accounts/#{account.id}/agents",
+             params: { name: 'Sub', email: email, custom_role_id: subset_role.id }, headers: manager_headers, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(account.account_users.find_by(user_id: User.from_email(email).id).custom_role_id).to eq(subset_role.id)
+      end
+
+      it 'forbids assigning a custom role that grants permissions it does not have' do
+        powerful_role = create(:custom_role, account: account, permissions: ['report_manage'])
+        email = "esc-#{SecureRandom.hex(4)}@example.com"
+
+        expect do
+          post "/api/v1/accounts/#{account.id}/agents",
+               params: { name: 'Esc', email: email, custom_role_id: powerful_role.id }, headers: manager_headers, as: :json
+        end.not_to change(User, :count)
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+
+      it 'forbids assigning a custom role from another account (cross-tenant)' do
+        foreign_role = create(:custom_role, account: create(:account), permissions: ['agent_manage'])
+        email = "ext-#{SecureRandom.hex(4)}@example.com"
+
+        post "/api/v1/accounts/#{account.id}/agents",
+             params: { name: 'Ext', email: email, custom_role_id: foreign_role.id }, headers: manager_headers, as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    describe 'PATCH /api/v1/accounts/{account.id}/agents/{id}' do
+      it 'forbids promoting an existing agent to administrator' do
+        target = create(:user, account: account, role: :agent)
+
+        patch "/api/v1/accounts/#{account.id}/agents/#{target.id}",
+              params: { role: :administrator }, headers: manager_headers, as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+        expect(account.account_users.find_by(user_id: target.id).role).to eq('agent')
+      end
+
+      it 'forbids editing an administrator' do
+        target_admin = create(:user, account: account, role: :administrator)
+
+        patch "/api/v1/accounts/#{account.id}/agents/#{target_admin.id}",
+              params: { name: 'Hacked' }, headers: manager_headers, as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+        expect(target_admin.reload.name).not_to eq('Hacked')
+      end
+
+      it 'forbids self-assigning a more powerful custom role' do
+        powerful_role = create(:custom_role, account: account, permissions: ['conversation_manage'])
+
+        patch "/api/v1/accounts/#{account.id}/agents/#{manager.id}",
+              params: { custom_role_id: powerful_role.id }, headers: manager_headers, as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+        expect(account.account_users.find_by(user_id: manager.id).custom_role_id).to eq(agent_manage_role.id)
+      end
+    end
+
+    describe 'DELETE /api/v1/accounts/{account.id}/agents/{id}' do
+      it 'forbids deleting an administrator' do
+        target_admin = create(:user, account: account, role: :administrator)
+
+        delete "/api/v1/accounts/#{account.id}/agents/#{target_admin.id}", headers: manager_headers, as: :json
+
+        expect(response).to have_http_status(:unauthorized)
+        expect(account.account_users.exists?(user_id: target_admin.id)).to be(true)
+      end
+
+      it 'allows deleting a plain agent' do
+        target = create(:user, account: account, role: :agent)
+
+        delete "/api/v1/accounts/#{account.id}/agents/#{target.id}", headers: manager_headers, as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(account.account_users.exists?(user_id: target.id)).to be(false)
+      end
+    end
+  end
 end
