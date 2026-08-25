@@ -8,7 +8,7 @@ class Api::V1::Accounts::InboxMembersController < Api::V1::Accounts::BaseControl
   end
 
   def create
-    authorize @inbox, :create?
+    authorize @inbox, :manage_members?
     ActiveRecord::Base.transaction do
       @inbox.add_members(agents_to_be_added_ids)
     end
@@ -16,13 +16,13 @@ class Api::V1::Accounts::InboxMembersController < Api::V1::Accounts::BaseControl
   end
 
   def update
-    authorize @inbox, :update?
+    authorize @inbox, :manage_members?
     update_agents_list
     fetch_updated_agents
   end
 
   def destroy
-    authorize @inbox, :destroy?
+    authorize @inbox, :manage_members?
     ActiveRecord::Base.transaction do
       @inbox.remove_members(params[:user_ids])
     end

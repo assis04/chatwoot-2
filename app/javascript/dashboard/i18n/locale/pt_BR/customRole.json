@@ -39,7 +39,9 @@
       "CONTACT_MANAGE": "Gerenciar contatos",
       "REPORT_MANAGE": "Gerenciar relatórios",
       "KNOWLEDGE_BASE_MANAGE": "Gerenciar base de conhecimento",
-      "AGENT_MANAGE": "Gerenciar agentes (adicionar, editar e remover — não gerencia administradores)"
+      "AGENT_MANAGE": "Gerenciar agentes (adicionar, editar e remover — não gerencia administradores)",
+      "TEAM_MANAGE": "Gerenciar times (criar, editar, remover e gerenciar membros)",
+      "INBOX_MANAGE": "Gerenciar caixas de entrada (editar configurações e colaboradores — não cria nem apaga caixas)"
     },
     "FORM": {
       "NAME": {

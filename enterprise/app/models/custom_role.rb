@@ -26,6 +26,12 @@
 # - 'agent_manage': (Fork Valcenter) Can create, update and remove AGENTS (never
 #   administrators, and cannot grant the administrator role — enforced in the
 #   AgentsController). Lets a non-admin onboard the team without full admin.
+# - 'team_manage': (Fork Valcenter) Can create, update, remove TEAMS and manage
+#   their members. Full management of the Teams settings tab.
+# - 'inbox_manage': (Fork Valcenter) Can view every inbox in the Inboxes settings
+#   tab, edit their settings and manage their collaborators (agents). CANNOT create
+#   or delete inboxes / channels — that stays admin-only (enforced by keeping
+#   InboxPolicy#create?/destroy? on administrator).
 
 class CustomRole < ApplicationRecord
   belongs_to :account
@@ -43,6 +49,8 @@ class CustomRole < ApplicationRecord
     report_manage
     knowledge_base_manage
     agent_manage
+    team_manage
+    inbox_manage
   ].freeze
 
   validates :name, presence: true

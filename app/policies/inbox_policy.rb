@@ -11,6 +11,11 @@ class InboxPolicy < ApplicationPolicy
     end
 
     def resolve
+      # Fork Valcenter: quem tem 'inbox_manage' enxerga TODAS as caixas na aba de
+      # Configurações. Não altera a visibilidade de conversas (essa vem de
+      # user.assigned_inboxes, que continua intocado).
+      return account.inboxes if account_user&.custom_role&.permissions&.include?('inbox_manage')
+
       user.assigned_inboxes
     end
   end
@@ -23,7 +28,7 @@ class InboxPolicy < ApplicationPolicy
     # FIXME: for agent bots, lets bring this validation to policies as well in future
     return true if @user.is_a?(AgentBot)
 
-    Current.user.assigned_inboxes.include? record
+    Current.user.assigned_inboxes.include?(record) || inbox_manage?
   end
 
   def assignable_agents?
@@ -43,11 +48,18 @@ class InboxPolicy < ApplicationPolicy
   end
 
   def update?
-    @account_user.administrator?
+    @account_user.administrator? || inbox_manage?
   end
 
   def destroy?
     @account_user.administrator?
+  end
+
+  # Fork Valcenter: gerenciar colaboradores (agentes) da caixa — alvo usado pelo
+  # InboxMembersController. Liberado pra admin e pra quem tem 'inbox_manage'. É
+  # separado de create?/destroy? (que criam/apagam a CAIXA e seguem só-admin).
+  def manage_members?
+    @account_user.administrator? || inbox_manage?
   end
 
   def set_agent_bot?
@@ -80,5 +92,11 @@ class InboxPolicy < ApplicationPolicy
 
   def set_inbound_calls?
     @account_user.administrator?
+  end
+
+  private
+
+  def inbox_manage?
+    @account_user.custom_role&.permissions&.include?('inbox_manage')
   end
 end

@@ -39,7 +39,9 @@
       "CONTACT_MANAGE": "Manage contacts",
       "REPORT_MANAGE": "Manage reports",
       "KNOWLEDGE_BASE_MANAGE": "Manage knowledge base",
-      "AGENT_MANAGE": "Manage agents (add, edit and remove — cannot manage administrators)"
+      "AGENT_MANAGE": "Manage agents (add, edit and remove — cannot manage administrators)",
+      "TEAM_MANAGE": "Manage teams (create, edit, remove and manage members)",
+      "INBOX_MANAGE": "Manage inboxes (edit settings and collaborators — cannot create or delete inboxes)"
     },
     "FORM": {
       "NAME": {

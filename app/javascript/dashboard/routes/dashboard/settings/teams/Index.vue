@@ -1,6 +1,10 @@
 <script setup>
 import { useAlert } from 'dashboard/composables';
 import { useAdmin } from 'dashboard/composables/useAdmin';
+import {
+  getUserPermissions,
+  hasPermissions,
+} from 'dashboard/helper/permissionsHelper';
 import BaseSettingsHeader from '../components/BaseSettingsHeader.vue';
 import SettingsLayout from '../SettingsLayout.vue';
 import { computed, ref } from 'vue';
@@ -17,6 +21,19 @@ const store = useStore();
 const { t } = useI18n();
 const getters = useStoreGetters();
 const { isAdmin } = useAdmin();
+
+const currentUser = useMapGetter('getCurrentUser');
+const currentAccountId = useMapGetter('getCurrentAccountId');
+
+// Fork Valcenter: admin OU quem tem 'team_manage' gerencia Times por completo
+// (criar, editar, apagar e membros).
+const canManageTeams = computed(() => {
+  if (isAdmin.value) return true;
+  return hasPermissions(
+    ['team_manage'],
+    getUserPermissions(currentUser.value, currentAccountId.value)
+  );
+});
 
 const loading = ref({});
 const searchQuery = ref('');
@@ -102,7 +119,7 @@ const confirmPlaceHolderText = computed(() =>
           </span>
         </template>
         <template #actions>
-          <router-link v-if="isAdmin" :to="{ name: 'settings_teams_new' }">
+          <router-link v-if="canManageTeams" :to="{ name: 'settings_teams_new' }">
             <Button :label="$t('TEAMS_SETTINGS.NEW_TEAM')" size="sm" />
           </router-link>
         </template>
@@ -155,7 +172,7 @@ const confirmPlaceHolderText = computed(() =>
               }"
             >
               <Button
-                v-if="isAdmin"
+                v-if="canManageTeams"
                 v-tooltip.top="$t('TEAMS_SETTINGS.LIST.EDIT_TEAM')"
                 icon="i-woot-settings"
                 slate
@@ -164,7 +181,7 @@ const confirmPlaceHolderText = computed(() =>
             </router-link>
 
             <Button
-              v-if="isAdmin"
+              v-if="canManageTeams"
               v-tooltip.top="$t('TEAMS_SETTINGS.DELETE.BUTTON_TEXT')"
               icon="i-woot-bin"
               slate
