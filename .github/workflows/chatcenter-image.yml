@@ -29,8 +29,12 @@ jobs:
         id: vars
         run: echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Habilita edicao EE
-        run: printf '\nENV CW_EDITION="ee"\n' >> docker/Dockerfile
+      # Fork Valcenter: build em Community Edition. Removemos o overlay enterprise
+      # do contexto ANTES do build — a imagem não embarca nenhum código EE
+      # (custom_roles foi reimplementado na base), e some o conflito de constante
+      # no Zeitwerk. Ver a reconstrução do custom_roles em Community.
+      - name: Community Edition (remove overlay enterprise)
+        run: rm -rf enterprise
 
       - name: Login no GHCR
         uses: docker/login-action@v3

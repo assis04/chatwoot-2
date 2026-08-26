@@ -8,10 +8,44 @@ class ConversationPolicy < ApplicationPolicy
   end
 
   def show?
-    administrator? || agent_bot? || agent_can_view_conversation?
+    # base (admin / bot / Digisac cross-number) gateia primeiro; se passar e o
+    # usuário tiver custom role, a hierarquia de permissão de conversa refina.
+    return false unless administrator? || agent_bot? || agent_can_view_conversation?
+    return true unless custom_role_permissions?
+
+    permissions = custom_role_permissions
+    return true if permissions.include?('conversation_manage')
+    return true if permits_unassigned_manage?(permissions)
+
+    permits_participating?(permissions)
   end
 
   private
+
+  # Fork Valcenter: custom_roles (Community) — hierarquia de visibilidade de conversa.
+  def permits_unassigned_manage?(permissions)
+    return false unless permissions.include?('conversation_unassigned_manage')
+
+    unassigned_conversation? || assigned_to_user?
+  end
+
+  def permits_participating?(permissions)
+    return false unless permissions.include?('conversation_participating_manage')
+
+    assigned_to_user? || participant?
+  end
+
+  def unassigned_conversation?
+    record.assignee_id.nil?
+  end
+
+  def custom_role_permissions?
+    account_user&.custom_role_id.present?
+  end
+
+  def custom_role_permissions
+    account_user&.custom_role&.permissions || []
+  end
 
   def agent_can_view_conversation?
     # Fork: a conversation transferred to a person (assignee) or that the user

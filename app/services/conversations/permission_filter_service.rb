@@ -9,11 +9,48 @@ class Conversations::PermissionFilterService
 
   def perform
     return conversations if user_role == 'administrator'
+    return filter_by_permissions(permissions) if user_has_custom_role?
 
     accessible_conversations
   end
 
   private
+
+  # Fork Valcenter: custom_roles (Community) — filtragem de conversa por permissão,
+  # com hierarquia manage > unassigned_manage > participating_manage. Portado do
+  # overlay enterprise pra base.
+  def user_has_custom_role?
+    user_role == 'agent' && account_user&.custom_role_id.present?
+  end
+
+  def permissions
+    account_user&.permissions || []
+  end
+
+  def filter_by_permissions(permissions)
+    if permissions.include?('conversation_manage')
+      accessible_conversations
+    elsif permissions.include?('conversation_unassigned_manage')
+      filter_unassigned_and_mine
+    elsif permissions.include?('conversation_participating_manage')
+      filter_participating_and_mine
+    else
+      Conversation.none
+    end
+  end
+
+  def filter_participating_and_mine
+    conversations = accessible_conversations
+    participant_conversation_ids = ConversationParticipant.where(account_id: account.id, user_id: user.id).select(:conversation_id)
+
+    conversations
+      .where(assignee_id: user.id)
+      .or(conversations.where(id: participant_conversation_ids))
+  end
+
+  def filter_unassigned_and_mine
+    accessible_conversations.where(assignee_id: [nil, user.id])
+  end
 
   # Fork customization — Digisac-style visibility. When the account opts in
   # (custom_attributes.department_visibility_enabled), an agent sees a conversation

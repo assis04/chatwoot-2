@@ -19,6 +19,7 @@ class Api::V1::Accounts::AgentsController < Api::V1::Accounts::BaseController
     )
 
     @agent = builder.perform
+    associate_agent_with_custom_role
   rescue AgentBuilder::LimitExceededError => e
     render_payment_required(e.message)
   end
@@ -26,6 +27,7 @@ class Api::V1::Accounts::AgentsController < Api::V1::Accounts::BaseController
   def update
     @agent.update!(agent_params.slice(:name).compact)
     @agent.current_account_user.update!(agent_params.slice(*account_user_attributes).compact)
+    associate_agent_with_custom_role
   end
 
   def destroy
@@ -80,6 +82,15 @@ class Api::V1::Accounts::AgentsController < Api::V1::Accounts::BaseController
     return if requested_custom_role_id.nil?
 
     raise Pundit::NotAuthorizedError unless Current.account.custom_roles.exists?(id: requested_custom_role_id)
+  end
+
+  # Fork Valcenter: atribui a função personalizada ao agente (custom_roles base).
+  # Antes vinha do override enterprise; agora é base. custom_role_id ausente/nil
+  # limpa a função (downgrade pra agente comum).
+  def associate_agent_with_custom_role
+    return if @agent.blank?
+
+    @agent.current_account_user.update!(custom_role_id: params[:custom_role_id])
   end
 
   def fetch_agent

@@ -40,17 +40,25 @@ module Chatwoot
     config.rails_i18n.enabled_modules = [:pluralization]
 
     config.eager_load_paths << Rails.root.join('lib')
-    config.eager_load_paths << Rails.root.join('enterprise/lib')
-    config.eager_load_paths << Rails.root.join('enterprise/listeners')
-    # rubocop:disable Rails/FilePath
-    config.eager_load_paths += Dir["#{Rails.root}/enterprise/app/**"]
-    # rubocop:enable Rails/FilePath
-    # Add enterprise views to the view paths
-    config.paths['app/views'].unshift('enterprise/app/views')
 
-    # Load enterprise initializers alongside standard initializers
-    enterprise_initializers = Rails.root.join('enterprise/config/initializers')
-    Dir[enterprise_initializers.join('**/*.rb')].each { |f| require f } if enterprise_initializers.exist?
+    # Fork Valcenter: só carrega o overlay enterprise quando a edição é EE.
+    # Em Community (DISABLE_ENTERPRISE=true ou sem a pasta enterprise/) essas
+    # linhas eram INCONDICIONAIS e faziam o enterprise/app entrar no autoload
+    # mesmo em CE — o que conflitava com a nossa reimplementação base do
+    # custom_roles. Guardando aqui, o CE não vê nada do enterprise.
+    if ChatwootApp.enterprise?
+      config.eager_load_paths << Rails.root.join('enterprise/lib')
+      config.eager_load_paths << Rails.root.join('enterprise/listeners')
+      # rubocop:disable Rails/FilePath
+      config.eager_load_paths += Dir["#{Rails.root}/enterprise/app/**"]
+      # rubocop:enable Rails/FilePath
+      # Add enterprise views to the view paths
+      config.paths['app/views'].unshift('enterprise/app/views')
+
+      # Load enterprise initializers alongside standard initializers
+      enterprise_initializers = Rails.root.join('enterprise/config/initializers')
+      Dir[enterprise_initializers.join('**/*.rb')].each { |f| require f } if enterprise_initializers.exist?
+    end
 
     # Settings in config/environments/* take precedence over those specified here.
     # Application configuration can go into files in config/initializers
