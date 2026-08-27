@@ -20,9 +20,12 @@ export default {
           name: 'custom_roles_list',
           meta: {
             featureFlag: FEATURE_FLAGS.CUSTOM_ROLES,
+            // Fork Valcenter: custom_roles reimplementado na base → disponível
+            // também em Community self-hosted.
             installationTypes: [
               INSTALLATION_TYPES.CLOUD,
               INSTALLATION_TYPES.ENTERPRISE,
+              INSTALLATION_TYPES.COMMUNITY,
             ],
             permissions: ['administrator'],
           },

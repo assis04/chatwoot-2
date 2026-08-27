@@ -30,6 +30,9 @@ class AccountUser < ApplicationRecord
   belongs_to :account
   belongs_to :user
   belongs_to :inviter, class_name: 'User', optional: true
+  # Fork Valcenter: custom_roles reimplementado na base (Community). Antes vinha
+  # do concern enterprise.
+  belongs_to :custom_role, optional: true
 
   enum role: { agent: 0, administrator: 1 }
   enum availability: { online: 0, offline: 1, busy: 2 }
@@ -56,7 +59,10 @@ class AccountUser < ApplicationRecord
   end
 
   def permissions
-    administrator? ? ['administrator'] : ['agent']
+    return ['administrator'] if administrator?
+    return custom_role.permissions + ['custom_role'] if custom_role.present?
+
+    ['agent']
   end
 
   def push_event_data
