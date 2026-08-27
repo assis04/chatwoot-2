@@ -44,18 +44,9 @@ const deleteMessage = computed(() => {
   return ` ${activeResponse.value.name} ? `;
 });
 
-const isFeatureEnabledOnAccount = useMapGetter(
-  'accounts/isFeatureEnabledonAccount'
-);
-
-const currentAccountId = useMapGetter('getCurrentAccountId');
-
-const isBehindAPaywall = computed(() => {
-  return !isFeatureEnabledOnAccount.value(
-    currentAccountId.value,
-    'custom_roles'
-  );
-});
+// Fork Valcenter: custom_roles é feature nossa (Community, reimplementada na
+// base) — nunca fica atrás de paywall nem depende do feature flag premium.
+const isBehindAPaywall = computed(() => false);
 
 const fetchCustomRoles = async () => {
   try {
