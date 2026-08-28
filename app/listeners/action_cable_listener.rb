@@ -41,7 +41,7 @@ class ActionCableListener < BaseListener
   def message_created(event)
     message, account = extract_message_and_account(event)
     conversation = message.conversation
-    tokens = user_tokens(account, conversation.inbox.members) + contact_tokens(conversation.contact_inbox, message)
+    tokens = user_tokens(account, conversation_visible_members(account, conversation)) + contact_tokens(conversation.contact_inbox, message)
 
     broadcast(account, tokens, MESSAGE_CREATED, message.push_event_data)
   end
@@ -49,7 +49,7 @@ class ActionCableListener < BaseListener
   def message_updated(event)
     message, account = extract_message_and_account(event)
     conversation = message.conversation
-    tokens = user_tokens(account, conversation.inbox.members) + contact_tokens(conversation.contact_inbox, message)
+    tokens = user_tokens(account, conversation_visible_members(account, conversation)) + contact_tokens(conversation.contact_inbox, message)
 
     broadcast(account, tokens, MESSAGE_UPDATED, message.push_event_data.merge(previous_changes: event.data[:previous_changes]))
   end
@@ -57,35 +57,35 @@ class ActionCableListener < BaseListener
   def first_reply_created(event)
     message, account = extract_message_and_account(event)
     conversation = message.conversation
-    tokens = user_tokens(account, conversation.inbox.members)
+    tokens = user_tokens(account, conversation_visible_members(account, conversation))
 
     broadcast(account, tokens, FIRST_REPLY_CREATED, message.push_event_data)
   end
 
   def conversation_created(event)
     conversation, account = extract_conversation_and_account(event)
-    tokens = user_tokens(account, conversation.inbox.members) + contact_inbox_tokens(conversation.contact_inbox)
+    tokens = user_tokens(account, conversation_visible_members(account, conversation)) + contact_inbox_tokens(conversation.contact_inbox)
 
     broadcast(account, tokens, CONVERSATION_CREATED, conversation.push_event_data)
   end
 
   def conversation_read(event)
     conversation, account = extract_conversation_and_account(event)
-    tokens = user_tokens(account, conversation.inbox.members)
+    tokens = user_tokens(account, conversation_visible_members(account, conversation))
 
     broadcast(account, tokens, CONVERSATION_READ, conversation.push_event_data)
   end
 
   def conversation_status_changed(event)
     conversation, account = extract_conversation_and_account(event)
-    tokens = user_tokens(account, conversation.inbox.members) + contact_inbox_tokens(conversation.contact_inbox)
+    tokens = user_tokens(account, conversation_visible_members(account, conversation)) + contact_inbox_tokens(conversation.contact_inbox)
 
     broadcast(account, tokens, CONVERSATION_STATUS_CHANGED, conversation.push_event_data)
   end
 
   def conversation_updated(event)
     conversation, account = extract_conversation_and_account(event)
-    tokens = user_tokens(account, conversation.inbox.members) + contact_inbox_tokens(conversation.contact_inbox)
+    tokens = user_tokens(account, conversation_visible_members(account, conversation)) + contact_inbox_tokens(conversation.contact_inbox)
 
     broadcast(account, tokens, CONVERSATION_UPDATED, conversation.push_event_data)
   end
@@ -133,21 +133,21 @@ class ActionCableListener < BaseListener
 
   def assignee_changed(event)
     conversation, account = extract_conversation_and_account(event)
-    tokens = user_tokens(account, conversation.inbox.members)
+    tokens = user_tokens(account, conversation_visible_members(account, conversation))
 
     broadcast(account, tokens, ASSIGNEE_CHANGED, conversation.push_event_data)
   end
 
   def team_changed(event)
     conversation, account = extract_conversation_and_account(event)
-    tokens = user_tokens(account, conversation.inbox.members)
+    tokens = user_tokens(account, conversation_visible_members(account, conversation))
 
     broadcast(account, tokens, TEAM_CHANGED, conversation.push_event_data)
   end
 
   def conversation_contact_changed(event)
     conversation, account = extract_conversation_and_account(event)
-    tokens = user_tokens(account, conversation.inbox.members)
+    tokens = user_tokens(account, conversation_visible_members(account, conversation))
 
     broadcast(account, tokens, CONVERSATION_CONTACT_CHANGED, conversation.push_event_data)
   end
@@ -195,7 +195,7 @@ class ActionCableListener < BaseListener
                            user.pubsub_token
                          end
 
-    tokens = user_tokens(account, conversation.inbox.members) + [conversation.contact_inbox.pubsub_token]
+    tokens = user_tokens(account, conversation_visible_members(account, conversation)) + [conversation.contact_inbox.pubsub_token]
     current_user_token.present? ? tokens - [current_user_token] : tokens
   end
 
@@ -203,6 +203,41 @@ class ActionCableListener < BaseListener
     agent_tokens = agents.pluck(:pubsub_token)
     admin_tokens = account.administrators.pluck(:pubsub_token)
     (agent_tokens + admin_tokens).uniq
+  end
+
+  # Fork Valcenter: destinatários dos eventos AO VIVO de uma conversa = só quem
+  # PODE vê-la, espelhando a hierarquia do ConversationPolicy#show? (custom_roles).
+  # Sem isso, o push ia pra TODOS os membros do inbox e uma conversa não-atribuída
+  # "piscava" na tela do agente restrito. Admin recebe sempre (adicionado em
+  # user_tokens). Agente comum (sem custom role) vê tudo do escopo dele → incluído.
+  # Candidatos = membros do inbox + membros do time (se department_visibility) +
+  # assignee + participantes. Mantém o comportamento antigo pra quem não é restrito.
+  def conversation_visible_members(account, conversation)
+    candidates = conversation.inbox.members.to_a
+    candidates += conversation.team.members.to_a if conversation.team_id && department_visibility_enabled?(account)
+    candidates << conversation.assignee if conversation.assignee_id
+    participant_ids = conversation.conversation_participants.pluck(:user_id)
+    candidates += User.where(id: participant_ids).to_a if participant_ids.any?
+    candidates.uniq!
+
+    account_users = account.account_users.where(user_id: candidates.map(&:id)).includes(:custom_role).index_by(&:user_id)
+
+    candidates.select do |user|
+      au = account_users[user.id]
+      next false if au.nil?
+      next true if au.administrator? || au.custom_role_id.blank?
+
+      perms = au.custom_role.permissions
+      next true if perms.include?('conversation_manage')
+      next(conversation.assignee_id.nil? || conversation.assignee_id == user.id) if perms.include?('conversation_unassigned_manage')
+      next(conversation.assignee_id == user.id || participant_ids.include?(user.id)) if perms.include?('conversation_participating_manage')
+
+      false
+    end
+  end
+
+  def department_visibility_enabled?(account)
+    account.custom_attributes.is_a?(Hash) && account.custom_attributes['department_visibility_enabled'] == true
   end
 
   def contact_tokens(contact_inbox, message)
