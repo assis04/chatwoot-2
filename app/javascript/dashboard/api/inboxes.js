@@ -66,6 +66,19 @@ class Inboxes extends CacheEnabledApiClient {
       inbound_calls_enabled: enabled,
     });
   }
+
+  // Fork Valcenter: status de conexão + QR da Evolution (proxy seguro)
+  getEvolutionStatuses() {
+    return axios.get(`${this.url}/evolution/statuses`);
+  }
+
+  getEvolutionStatus(inboxId) {
+    return axios.get(`${this.url}/${inboxId}/evolution/status`);
+  }
+
+  evolutionConnect(inboxId) {
+    return axios.post(`${this.url}/${inboxId}/evolution/connect`);
+  }
 }
 
 export default new Inboxes();

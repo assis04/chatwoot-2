@@ -285,6 +285,10 @@ Rails.application.routes.draw do
             get :health, on: :member
             post :register_webhook, on: :member
             post :reset_secret, on: :member
+            # Fork Valcenter: status de conexão + QR da Evolution (proxy seguro)
+            get 'evolution/statuses', on: :collection, to: 'inboxes/evolution#statuses'
+            get 'evolution/status', on: :member, to: 'inboxes/evolution#status'
+            post 'evolution/connect', on: :member, to: 'inboxes/evolution#connect'
             if ChatwootApp.enterprise?
               resource :conference, only: %i[create destroy], controller: 'conference' do
                 get :token, on: :member

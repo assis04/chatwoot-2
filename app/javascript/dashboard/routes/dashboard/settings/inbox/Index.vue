@@ -17,8 +17,11 @@ import {
   useStore,
 } from 'dashboard/composables/store';
 import ChannelName from './components/ChannelName.vue';
+import ConnectionStatus from './components/ConnectionStatus.vue';
+import EvolutionConnectModal from './components/EvolutionConnectModal.vue';
 import ChannelIcon from 'next/icon/ChannelIcon.vue';
 import Button from 'dashboard/components-next/button/Button.vue';
+import InboxesAPI from 'dashboard/api/inboxes';
 
 const getters = useStoreGetters();
 const store = useStore();
@@ -44,8 +47,33 @@ const searchQuery = ref('');
 
 const inboxes = useMapGetter('inboxes/getInboxes');
 
+// Fork Valcenter: status de conexão (Evolution) por caixa + modal de QR.
+const connectionStatuses = ref({}); // { [inboxId]: 'open'|'connecting'|'close'|'unknown' }
+const qrInbox = ref(null);
+
+const loadConnectionStatuses = async () => {
+  try {
+    const { data } = await InboxesAPI.getEvolutionStatuses();
+    connectionStatuses.value = data.statuses || {};
+  } catch (error) {
+    // Evolution não configurada/indisponível — badges simplesmente não aparecem.
+    connectionStatuses.value = {};
+  }
+};
+
+const isEvolutionInbox = inbox => inbox.channel_type === 'Channel::Api';
+const connectionStatusOf = inbox => connectionStatuses.value[inbox.id];
+
+const openQrModal = inbox => {
+  qrInbox.value = inbox;
+};
+const closeQrModal = () => {
+  qrInbox.value = null;
+};
+
 onActivated(() => {
   store.dispatch('inboxes/get');
+  loadConnectionStatuses();
 });
 
 const inboxesList = computed(() => {
@@ -200,7 +228,16 @@ const formatPhoneNumber = value => {
               </div>
             </div>
           </div>
-          <div class="flex gap-3 justify-end">
+          <div class="flex items-center gap-3 justify-end">
+            <template v-if="isEvolutionInbox(inbox) && connectionStatusOf(inbox)">
+              <ConnectionStatus :status="connectionStatusOf(inbox)" />
+              <Button
+                v-if="connectionStatusOf(inbox) === 'close' && canManageInboxes"
+                :label="$t('INBOX_MGMT.EVOLUTION.CONNECT')"
+                size="sm"
+                @click="openQrModal(inbox)"
+              />
+            </template>
             <router-link
               :to="{
                 name: 'settings_inbox_show',
@@ -240,6 +277,14 @@ const formatPhoneNumber = value => {
       :confirm-place-holder-text="confirmPlaceHolderText"
       @on-confirm="confirmDeletion"
       @on-close="closeDelete"
+    />
+
+    <EvolutionConnectModal
+      v-if="qrInbox"
+      :inbox-id="qrInbox.id"
+      :inbox-name="qrInbox.name"
+      @close="closeQrModal"
+      @connected="loadConnectionStatuses"
     />
   </SettingsLayout>
 </template>

@@ -1,5 +1,23 @@
 {
   "INBOX_MGMT": {
+    "EVOLUTION": {
+      "STATUS": {
+        "CONNECTED": "Connected",
+        "DISCONNECTED": "Disconnected",
+        "CONNECTING": "Connecting",
+        "UNKNOWN": "Unknown"
+      },
+      "CONNECT": "Connect",
+      "QR": {
+        "TITLE": "Connect WhatsApp",
+        "INSTRUCTIONS": "On your phone, open WhatsApp > Linked devices > Link a device, then point it at the QR code below.",
+        "PAIRING_CODE": "Or use the code:",
+        "CONNECTED": "Connected successfully!",
+        "ERROR": "Couldn't generate the QR code. Please try again.",
+        "REFRESH": "Refresh QR",
+        "CLOSE": "Close"
+      }
+    },
     "HEADER": "Inboxes",
     "DESCRIPTION": "A channel is the mode of communication your customer chooses to interact with you. An inbox is where you manage interactions for a specific channel. It can include communications from various sources such as email, live chat, and social media.",
     "LEARN_MORE": "Learn more about inboxes",

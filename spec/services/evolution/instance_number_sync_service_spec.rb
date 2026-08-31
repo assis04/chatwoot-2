@@ -38,12 +38,14 @@ RSpec.describe Evolution::InstanceNumberSyncService do
   end
 
   describe '#perform' do
-    it 'grava o número (E.164) a partir do ownerJid, casando pelo webhook URL-decoded' do
+    it 'grava número (E.164) e status de conexão, casando pelo webhook URL-decoded' do
       stub_fetch
       channel = create(:channel_api, webhook_url: 'https://x/evolution/chatwoot/webhook/Valcenter%20Guarulhos')
 
       expect(described_class.new.perform).to eq(1)
-      expect(channel.reload.additional_attributes['phone_number']).to eq('+5511987654321')
+      attrs = channel.reload.additional_attributes
+      expect(attrs['phone_number']).to eq('+5511987654321')
+      expect(attrs['connection_status']).to eq('open')
     end
 
     it 'suporta o formato embrulhado e o fallback pro campo number' do
