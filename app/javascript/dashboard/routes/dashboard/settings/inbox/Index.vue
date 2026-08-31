@@ -99,6 +99,26 @@ const openDelete = inbox => {
   showDeletePopup.value = true;
   selectedInbox.value = inbox;
 };
+
+// Fork Valcenter: caixas Evolution (Channel::Api) guardam o número do WhatsApp em
+// additional_attributes.phone_number (backfill a partir do ownerJid da instância).
+// Formata BR em E.164 -> +55 (11) 98765-4321; se não reconhecer, mostra como veio.
+const inboxPhoneNumber = inbox => {
+  const raw = inbox?.additional_attributes?.phone_number || inbox?.phone_number;
+  return raw ? String(raw).trim() : '';
+};
+
+const formatPhoneNumber = value => {
+  const digits = String(value).replace(/\D/g, '');
+  if (digits.startsWith('55') && (digits.length === 12 || digits.length === 13)) {
+    const ddd = digits.slice(2, 4);
+    const rest = digits.slice(4);
+    const mid = rest.length === 9 ? rest.slice(0, 5) : rest.slice(0, 4);
+    const end = rest.length === 9 ? rest.slice(5) : rest.slice(4);
+    return `+55 (${ddd}) ${mid}-${end}`;
+  }
+  return value.startsWith('+') ? value : `+${digits}`;
+};
 </script>
 
 <template>
@@ -163,12 +183,21 @@ const openDelete = inbox => {
               <span class="block text-heading-3 text-n-slate-12 capitalize">
                 {{ inbox.name }}
               </span>
-              <ChannelName
-                :channel-type="inbox.channel_type"
-                :medium="inbox.medium"
-                :voice-enabled="inbox.voice_enabled"
-                class="text-body-main text-n-slate-11"
-              />
+              <div
+                class="flex items-center gap-2 text-body-main text-n-slate-11"
+              >
+                <ChannelName
+                  :channel-type="inbox.channel_type"
+                  :medium="inbox.medium"
+                  :voice-enabled="inbox.voice_enabled"
+                />
+                <template v-if="inboxPhoneNumber(inbox)">
+                  <span class="text-n-slate-9" aria-hidden="true">·</span>
+                  <span class="tabular-nums">
+                    {{ formatPhoneNumber(inboxPhoneNumber(inbox)) }}
+                  </span>
+                </template>
+              </div>
             </div>
           </div>
           <div class="flex gap-3 justify-end">

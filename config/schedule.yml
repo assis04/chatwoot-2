@@ -74,3 +74,11 @@ remove_orphan_conversations_job:
   cron: '0 */12 * * *'
   class: 'Internal::RemoveOrphanConversationsJob'
   queue: housekeeping
+
+# Fork Valcenter: a cada 30 min sincroniza o número do WhatsApp das caixas
+# Evolution (Channel::Api) a partir do ownerJid da instância. No-op se
+# EVOLUTION_API_URL / EVOLUTION_API_KEY não estiverem setados.
+evolution_sync_instance_numbers_job:
+  cron: '*/30 * * * *'
+  class: 'Evolution::SyncInstanceNumbersJob'
+  queue: scheduled_jobs
