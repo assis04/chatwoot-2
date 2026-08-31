@@ -64,6 +64,13 @@ const loadConnectionStatuses = async () => {
 const isEvolutionInbox = inbox => inbox.channel_type === 'Channel::Api';
 const connectionStatusOf = inbox => connectionStatuses.value[inbox.id];
 
+// Oferece reconectar (gerar QR) sempre que não está conectada: desconectada
+// (close) ou presa no meio do pareamento (connecting). 'unknown' não mostra
+// (Evolution indisponível — não adianta abrir o QR).
+const canReconnect = inbox =>
+  canManageInboxes.value &&
+  ['close', 'connecting'].includes(connectionStatusOf(inbox));
+
 const openQrModal = inbox => {
   qrInbox.value = inbox;
 };
@@ -232,7 +239,7 @@ const formatPhoneNumber = value => {
             <template v-if="isEvolutionInbox(inbox) && connectionStatusOf(inbox)">
               <ConnectionStatus :status="connectionStatusOf(inbox)" />
               <Button
-                v-if="connectionStatusOf(inbox) === 'close' && canManageInboxes"
+                v-if="canReconnect(inbox)"
                 :label="$t('INBOX_MGMT.EVOLUTION.CONNECT')"
                 size="sm"
                 @click="openQrModal(inbox)"
