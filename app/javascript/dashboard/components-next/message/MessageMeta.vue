@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { messageTimestamp } from 'shared/helpers/timeHelper';
 
 import MessageStatus from './MessageStatus.vue';
@@ -129,6 +130,10 @@ const statusToShow = computed(() => {
 
   return MESSAGE_STATUS.PROGRESS;
 });
+
+// Fork Valcenter: mensagem editada no WhatsApp (via Evolution) marca content_attributes.edited
+const { t } = useI18n();
+const wasEdited = computed(() => Boolean(contentAttributes.value?.edited));
 </script>
 
 <template>
@@ -136,6 +141,9 @@ const statusToShow = computed(() => {
     <div class="inline">
       <time class="inline">{{ readableTime }}</time>
     </div>
+    <span v-if="wasEdited" class="text-n-slate-10 italic">{{
+      t('CONVERSATION.CONTEXT_MENU.EDITED_LABEL')
+    }}</span>
     <Icon v-if="isPrivate" icon="i-lucide-lock-keyhole" class="size-3" />
     <MessageStatus v-if="showStatusIndicator" :status="statusToShow" />
   </div>

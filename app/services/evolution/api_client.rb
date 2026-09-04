@@ -84,7 +84,30 @@ class Evolution::ApiClient
     http_get("/instance/connect/#{escape(instance)}", timeout: CONNECT_TIMEOUT)
   end
 
+  # Edita uma mensagem já enviada no WhatsApp (janela de ~15 min do WhatsApp — o
+  # caller valida). key = { remoteJid:, fromMe: true, id: <WAID> }.
+  def update_message(instance, number, key, text)
+    http_post("/chat/updateMessage/#{escape(instance)}", { number: number, key: key, text: text })
+  end
+
   private
+
+  def http_post(path, body, timeout: TIMEOUT)
+    return nil unless self.class.configured?
+
+    response = self.class.post(
+      "#{self.class.base_url}#{path}",
+      headers: { 'apikey' => self.class.api_key, 'Accept' => 'application/json', 'Content-Type' => 'application/json' },
+      body: body.to_json,
+      timeout: timeout
+    )
+    return nil unless response.success?
+
+    response.parsed_response
+  rescue StandardError => e
+    Rails.logger.error("[Evolution::ApiClient] POST #{path}: #{e.class} #{e.message}")
+    nil
+  end
 
   def http_get(path, timeout: TIMEOUT)
     return nil unless self.class.configured?

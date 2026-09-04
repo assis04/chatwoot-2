@@ -16,6 +16,7 @@ import MenuItem from '../../../components/widgets/conversation/contextMenu/menuI
 import { useTrack } from 'dashboard/composables';
 import NextButton from 'dashboard/components-next/button/Button.vue';
 import ReportCaptainMessageDialog from './ReportCaptainMessageDialog.vue';
+import MessageAPI from 'dashboard/api/inbox/message';
 
 export default {
   components: {
@@ -59,6 +60,9 @@ export default {
     return {
       isCannedResponseModalOpen: false,
       showDeleteModal: false,
+      showEditModal: false,
+      editContent: '',
+      editSaving: false,
     };
   },
   computed: {
@@ -82,6 +86,24 @@ export default {
     contentAttributes() {
       return useSnakeCase(
         this.message.content_attributes ?? this.message.contentAttributes
+      );
+    },
+    // Fork Valcenter: mostra "Editar" só em mensagem enviada pelo agente, do
+    // WhatsApp (source_id WAID) e dentro da janela de 15 min do WhatsApp.
+    canEditMessage() {
+      const m = this.message;
+      const type = m.message_type ?? m.messageType;
+      const sourceId = m.source_id ?? m.sourceId ?? '';
+      const createdAt = Number(m.created_at ?? m.createdAt ?? 0);
+      const within15Min =
+        createdAt > 0 && Date.now() / 1000 - createdAt < 15 * 60;
+      return (
+        type === 1 &&
+        typeof sourceId === 'string' &&
+        sourceId.startsWith('WAID:') &&
+        within15Min &&
+        !this.contentAttributes?.deleted &&
+        !!this.messageContent
       );
     },
   },
@@ -163,6 +185,32 @@ export default {
       this.handleClose();
       this.$refs.reportDialog?.open();
     },
+    openEditModal() {
+      this.editContent = this.messageContent ?? '';
+      this.handleClose();
+      this.showEditModal = true;
+    },
+    closeEditModal() {
+      this.showEditModal = false;
+    },
+    async confirmEdit() {
+      const content = (this.editContent || '').trim();
+      if (!content || this.editSaving) return;
+      this.editSaving = true;
+      try {
+        await MessageAPI.editEvolutionMessage(
+          this.conversationId,
+          this.messageId,
+          content
+        );
+        useAlert(this.$t('CONVERSATION.CONTEXT_MENU.EDIT_MESSAGE.SUCCESS'));
+        this.showEditModal = false;
+      } catch (error) {
+        useAlert(parseAPIErrorResponse(error));
+      } finally {
+        this.editSaving = false;
+      }
+    },
   },
 };
 </script>
@@ -192,6 +240,41 @@ export default {
       :confirm-text="$t('CONVERSATION.CONTEXT_MENU.DELETE_CONFIRMATION.DELETE')"
       :reject-text="$t('CONVERSATION.CONTEXT_MENU.DELETE_CONFIRMATION.CANCEL')"
     />
+    <!-- Editar mensagem (WhatsApp via Evolution) -->
+    <woot-modal
+      v-if="showEditModal"
+      v-model:show="showEditModal"
+      :on-close="closeEditModal"
+    >
+      <div class="p-8">
+        <h3 class="mb-1 text-lg font-medium text-n-slate-12">
+          {{ $t('CONVERSATION.CONTEXT_MENU.EDIT_MESSAGE.TITLE') }}
+        </h3>
+        <p class="mb-4 text-sm text-n-slate-11">
+          {{ $t('CONVERSATION.CONTEXT_MENU.EDIT_MESSAGE.SUBTITLE') }}
+        </p>
+        <textarea
+          v-model="editContent"
+          rows="4"
+          class="w-full p-3 text-sm rounded-lg resize-none border border-n-weak bg-n-background text-n-slate-12 focus:outline-none focus:ring-1 focus:ring-n-brand"
+          @keydown.meta.enter="confirmEdit"
+        />
+        <div class="flex justify-end gap-2 mt-4">
+          <NextButton
+            color="slate"
+            variant="faded"
+            :label="$t('CONVERSATION.CONTEXT_MENU.EDIT_MESSAGE.CANCEL')"
+            @click="closeEditModal"
+          />
+          <NextButton
+            :label="$t('CONVERSATION.CONTEXT_MENU.EDIT_MESSAGE.SAVE')"
+            :is-loading="editSaving"
+            :disabled="!editContent.trim()"
+            @click="confirmEdit"
+          />
+        </div>
+      </div>
+    </woot-modal>
     <NextButton
       v-if="!hideButton"
       ghost
@@ -225,6 +308,15 @@ export default {
           }"
           variant="icon"
           @click.stop="handleCopy"
+        />
+        <MenuItem
+          v-if="canEditMessage"
+          :option="{
+            icon: 'edit',
+            label: $t('CONVERSATION.CONTEXT_MENU.EDIT'),
+          }"
+          variant="icon"
+          @click.stop="openEditModal"
         />
         <MenuItem
           v-if="enabledOptions['translate']"

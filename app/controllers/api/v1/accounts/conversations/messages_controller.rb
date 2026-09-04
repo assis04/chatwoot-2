@@ -57,6 +57,40 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     render_could_not_create_error(e.details.presence || e.message)
   end
 
+  # Fork Valcenter: edita no WhatsApp uma mensagem já enviada pelo agente, via
+  # Evolution (janela de ~15 min do WhatsApp). Guarda o texto original em
+  # content_attributes['edited'] e reflete o novo conteúdo no Chatwoot.
+  # Autorização = acesso à conversa (BaseController já faz authorize :show?).
+  def evolution_edit
+    return render_evolution_error('Edição disponível apenas em caixas Evolution (API)', :unprocessable_entity) unless @conversation.inbox.api?
+
+    msg = message
+    new_content = permitted_params[:content].to_s.strip
+    return render_evolution_error('Informe o novo texto', :unprocessable_entity) if new_content.blank?
+    return render_evolution_error('Só mensagens enviadas pelo agente podem ser editadas', :unprocessable_entity) unless msg.outgoing?
+    return render_evolution_error('Mensagem sem referência no WhatsApp', :unprocessable_entity) unless msg.source_id.to_s.start_with?('WAID:')
+    return render_evolution_error('A janela de edição do WhatsApp (15 min) expirou', :unprocessable_entity) if msg.created_at < 15.minutes.ago
+
+    number = @conversation.contact.phone_number.to_s.gsub(/\D/, '')
+    number = @conversation.contact.identifier.to_s.split('@').first.to_s.gsub(/\D/, '') if number.blank?
+    return render_evolution_error('Contato sem número de WhatsApp', :unprocessable_entity) if number.blank?
+
+    instance = Evolution::ApiClient.instance_from_webhook(@conversation.inbox.channel.webhook_url)
+    return render_evolution_error('Integração Evolution não configurada', :service_unavailable) if instance.blank? || !Evolution::ApiClient.configured?
+
+    key = { remoteJid: "#{number}@s.whatsapp.net", fromMe: true, id: msg.source_id.delete_prefix('WAID:') }
+    result = Evolution::ApiClient.new.update_message(instance, number, key, new_content)
+    return render_evolution_error('A Evolution não confirmou a edição — tente novamente', :bad_gateway) if result.blank?
+
+    attrs = (msg.content_attributes || {}).merge(
+      'edited' => { 'original' => msg.content, 'edited_at' => Time.current.utc.iso8601, 'edited_by' => Current.user&.id }
+    )
+    msg.update!(content: new_content, content_attributes: attrs)
+    msg.send_update_event
+    @message = msg
+    render json: @message.push_event_data
+  end
+
   private
 
   def message
@@ -68,7 +102,11 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
   end
 
   def permitted_params
-    params.permit(:id, :target_language, :status, :external_error)
+    params.permit(:id, :target_language, :status, :external_error, :content)
+  end
+
+  def render_evolution_error(message, status)
+    render json: { error: message }, status: status
   end
 
   def already_translated_content_available?

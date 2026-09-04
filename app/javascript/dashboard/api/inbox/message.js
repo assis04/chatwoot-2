@@ -114,6 +114,14 @@ class MessageApi extends ApiClient {
       }
     );
   }
+
+  // Fork Valcenter: edita no WhatsApp uma mensagem já enviada (via Evolution).
+  editEvolutionMessage(conversationId, messageId, content) {
+    return axios.post(
+      `${this.url}/${conversationId}/messages/${messageId}/evolution_edit`,
+      { content }
+    );
+  }
 }
 
 export default new MessageApi();

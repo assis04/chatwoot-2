@@ -297,6 +297,15 @@
       "COPY": "Copiar",
       "REPLY_TO": "Responder mensagem",
       "DELETE": "Excluir",
+      "EDIT": "Editar",
+      "EDITED_LABEL": "(editada)",
+      "EDIT_MESSAGE": {
+        "TITLE": "Editar mensagem",
+        "SUBTITLE": "A edição é aplicada no WhatsApp (até 15 min após o envio) e refletida aqui.",
+        "SAVE": "Salvar",
+        "CANCEL": "Cancelar",
+        "SUCCESS": "Mensagem editada"
+      },
       "CREATE_A_CANNED_RESPONSE": "Adicionar às respostas prontas",
       "TRANSLATE": "Traduzir",
       "COPY_PERMALINK": "Copiar link para a mensagem",

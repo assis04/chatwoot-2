@@ -311,6 +311,15 @@
       "COPY": "Copy",
       "REPLY_TO": "Reply to this message",
       "DELETE": "Delete",
+      "EDIT": "Edit",
+      "EDITED_LABEL": "(edited)",
+      "EDIT_MESSAGE": {
+        "TITLE": "Edit message",
+        "SUBTITLE": "The edit is applied on WhatsApp (within 15 min of sending) and reflected here.",
+        "SAVE": "Save",
+        "CANCEL": "Cancel",
+        "SUCCESS": "Message edited"
+      },
       "CREATE_A_CANNED_RESPONSE": "Add to canned responses",
       "TRANSLATE": "Translate",
       "COPY_PERMALINK": "Copy link to the message",
