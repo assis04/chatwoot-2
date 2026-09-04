@@ -371,6 +371,10 @@ const payloadForContextMenu = computed(() => {
     content_attributes: props.contentAttributes,
     content: props.content,
     conversation_id: props.conversationId,
+    // Fork Valcenter: campos usados pela ação "Editar" (mensagem WhatsApp recente)
+    message_type: props.messageType,
+    source_id: props.sourceId,
+    created_at: props.createdAt,
   };
 });
 
