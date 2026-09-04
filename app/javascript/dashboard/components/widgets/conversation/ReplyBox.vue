@@ -209,6 +209,15 @@ export default {
     inbox() {
       return this.$store.getters['inboxes/getInbox'](this.inboxId);
     },
+    // Fork Valcenter: quando a conversa é de um inbox do qual o agente NÃO é membro
+    // (visível via atribuição/time/participação/custom_role cross-inbox), esse inbox
+    // fica FORA do store de inboxes do front, então `inbox.channel_type` vira undefined
+    // e os botões de anexo/áudio (que derivam do canal) somem. Caímos para o canal que
+    // já vem no payload da conversa (`meta.channel`) pra detectar o canal corretamente.
+    // Sobrescreve o `channelType` do inboxMixin (computed do componente tem precedência).
+    channelType() {
+      return this.inbox?.channel_type || this.currentChat?.meta?.channel;
+    },
     messagePlaceHolder() {
       if (this.isEditorDisabled) {
         if (this.isAWhatsAppChannel) {
