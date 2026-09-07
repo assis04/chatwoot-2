@@ -6,19 +6,23 @@ class ConversationApi extends ApiClient {
     super('conversations', { accountScoped: true });
   }
 
-  get({
-    inboxId,
-    status,
-    assigneeType,
-    page,
-    labels,
-    teamId,
-    conversationType,
-    sortBy,
-    updatedWithin,
-    q,
-  }) {
+  get(
+    {
+      inboxId,
+      status,
+      assigneeType,
+      page,
+      labels,
+      teamId,
+      conversationType,
+      sortBy,
+      updatedWithin,
+      q,
+    },
+    options = {}
+  ) {
     return axios.get(this.url, {
+      signal: options.signal,
       params: {
         inbox_id: inboxId,
         team_id: teamId,
@@ -35,8 +39,9 @@ class ConversationApi extends ApiClient {
     });
   }
 
-  filter(payload) {
+  filter(payload, options = {}) {
     return axios.post(`${this.url}/filter`, payload.queryData, {
+      signal: options.signal,
       params: {
         page: payload.page,
       },
