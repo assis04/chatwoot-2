@@ -11,4 +11,7 @@ json.custom_attributes resource.custom_attributes if resource.custom_attributes.
 json.name resource.name
 json.role resource.role
 json.thumbnail resource.avatar_url
-json.custom_role_id resource.current_account_user&.custom_role_id if ChatwootApp.enterprise?
+# Fork Valcenter (CE): custom_roles foi reconstruido na base, entao expomos o
+# custom_role_id sempre — nao so no EE. Sem isso o front nunca recebe a funcao e a
+# tela de Agentes mostra so "Agente"/"Administrador". Ver [[chatwoot-community-edition-migration]].
+json.custom_role_id resource.current_account_user&.custom_role_id
