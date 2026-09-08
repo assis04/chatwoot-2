@@ -96,6 +96,29 @@ describe ConversationFinder do
       end
     end
 
+    # Fork Valcenter: a aba "Não atribuídas" nunca lista/conta resolvidas, mesmo
+    # com o filtro de status em "Todas" — resolvida sem dono aparece só em "Todos".
+    context 'with assignee_type unassigned and status all (fork: exclui resolvidas)' do
+      let!(:unassigned_resolved) do
+        create(:conversation, account: account, inbox: inbox, status: 'resolved')
+      end
+      let(:params) { { assignee_type: 'unassigned', status: 'all' } }
+
+      it 'does not list resolved conversations in the unassigned tab' do
+        result = conversation_finder.perform
+        ids = result[:conversations].map(&:id)
+        expect(ids).not_to include(unassigned_resolved.id)
+        # continua listando a única não-atribuída ABERTA do seed
+        expect(result[:conversations].length).to be 1
+      end
+
+      it 'excludes resolved from unassigned_count but keeps it in all_count' do
+        result = conversation_finder.perform
+        expect(result[:count][:unassigned_count]).to be 1
+        expect(result[:count][:all_count]).to be 6
+      end
+    end
+
     context 'with unread sort' do
       let(:params) { { status: 'open', sort_by: 'unread' } }
 

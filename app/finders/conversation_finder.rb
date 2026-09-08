@@ -41,8 +41,7 @@ class ConversationFinder
   def perform
     set_up
 
-    mine_count, unassigned_count, all_count, unread_count = set_count_for_all_conversations
-    assigned_count = all_count - unassigned_count
+    mine_count, unassigned_count, assigned_count, all_count, unread_count = set_count_for_all_conversations
 
     filter_by_assignee_type
 
@@ -61,8 +60,7 @@ class ConversationFinder
   def perform_meta_only
     set_up
 
-    mine_count, unassigned_count, all_count, unread_count = set_count_for_all_conversations
-    assigned_count = all_count - unassigned_count
+    mine_count, unassigned_count, assigned_count, all_count, unread_count = set_count_for_all_conversations
 
     {
       count: {
@@ -131,7 +129,11 @@ class ConversationFinder
     when 'me'
       @conversations = @conversations.assigned_to(current_user)
     when 'unassigned'
-      @conversations = @conversations.unassigned
+      # Fork Valcenter: a aba "Não atribuídas" é a fila de trabalho ATIVO sem dono —
+      # nunca lista resolvidas (mesmo com o filtro de status em "Todas"). As
+      # resolvidas sem dono aparecem só em "Todos"/"Resolvidas". Espelha o contador
+      # em set_count_for_all_conversations.
+      @conversations = @conversations.unassigned.where.not(status: :resolved)
     when 'assigned'
       @conversations = @conversations.assigned
     when 'unread'
@@ -194,18 +196,23 @@ class ConversationFinder
 
     counts = @conversations.unscope(:order).pick(
       Arel.sql("COUNT(*) FILTER (WHERE assignee_id = #{current_user.id})"),
-      Arel.sql('COUNT(*) FILTER (WHERE assignee_id IS NULL)'),
+      # Fork Valcenter: "não atribuídas" NÃO conta resolvidas (é a fila de trabalho
+      # ativo sem dono). Espelha o filtro da lista em filter_by_assignee_type.
+      Arel.sql("COUNT(*) FILTER (WHERE assignee_id IS NULL AND status <> #{Conversation.statuses[:resolved]})"),
+      Arel.sql('COUNT(*) FILTER (WHERE assignee_id IS NOT NULL)'),
       Arel.sql('COUNT(*)')
-    ) || [0, 0, 0]
+    ) || [0, 0, 0, 0]
     # Fork: unread-by-agent precisa do join de conversation_read_states, então não
-    # entra no FILTER do pick acima — calculamos à parte e anexamos como 4º valor.
+    # entra no FILTER do pick acima — calculamos à parte e anexamos como 5º valor.
     counts + [@conversations.unread_by_user(current_user).count]
   end
 
   def legacy_count_for_all_conversations
     [
       @conversations.assigned_to(current_user).count,
-      @conversations.unassigned.count,
+      # Fork Valcenter: "não atribuídas" exclui resolvidas (espelha o pick acima).
+      @conversations.unassigned.where.not(status: :resolved).count,
+      @conversations.assigned.count,
       @conversations.count,
       @conversations.unread_by_user(current_user).count
     ]

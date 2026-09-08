@@ -100,8 +100,13 @@ const getters = {
   getUnAssignedChats: _state => activeFilters => {
     return _state.allConversations.filter(conversation => {
       const isUnAssigned = !conversation.meta.assignee;
+      // Fork Valcenter: a aba "Não atribuídas" é a fila de trabalho ativo sem dono
+      // — nunca lista resolvidas, mesmo com o filtro de status em "Todas". Espelha
+      // o back-end (conversation_finder.rb#filter_by_assignee_type). Resolvida
+      // sem dono aparece só em "Todos"/"Resolvidas".
+      const isNotResolved = conversation.status !== 'resolved';
       const shouldFilter = applyPageFilters(conversation, activeFilters);
-      return isUnAssigned && shouldFilter;
+      return isUnAssigned && isNotResolved && shouldFilter;
     });
   },
   getParticipatingChats: (_state, _, __, rootGetters) => activeFilters => {

@@ -321,7 +321,11 @@ function filterByAssigneeTab(conversations) {
     );
   }
   if (activeAssigneeTab.value === wootConstants.ASSIGNEE_TYPE.UNASSIGNED) {
-    return conversations.filter(c => !c.meta?.assignee);
+    // Fork Valcenter: "Não atribuídas" nunca inclui resolvidas (espelha o back e
+    // o getter getUnAssignedChats) — resolvida sem dono só em "Todos".
+    return conversations.filter(
+      c => !c.meta?.assignee && c.status !== 'resolved'
+    );
   }
   return [...conversations];
 }
