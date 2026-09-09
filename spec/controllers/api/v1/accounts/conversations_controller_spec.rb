@@ -444,6 +444,42 @@ RSpec.describe 'Conversations API', type: :request do
           expect(response_data[:additional_attributes]).to eq(additional_attributes)
         end
 
+        # Fork Valcenter: enviar pela aba Contatos atribui a conversa ao agente que
+        # enviou. Com lock_to_single_conversation o builder REUSA a conversa e antes
+        # ignorava o assignee_id — o honor_requested_assignee corrige isso.
+        it 'assigns the reused conversation to the requesting agent when it has no owner' do
+          allow(Rails.configuration.dispatcher).to receive(:dispatch)
+          inbox.update!(lock_to_single_conversation: true)
+          existing = create(:conversation, account: account, inbox: inbox, contact: contact,
+                                           contact_inbox: contact_inbox, assignee: nil)
+
+          expect do
+            post "/api/v1/accounts/#{account.id}/conversations",
+                 headers: agent.create_new_auth_token,
+                 params: { source_id: contact_inbox.source_id, assignee_id: agent.id, message: { content: 'oi' } },
+                 as: :json
+          end.not_to change(Conversation, :count)
+
+          expect(response).to have_http_status(:success)
+          expect(existing.reload.assignee_id).to eq(agent.id)
+        end
+
+        it 'does not steal a reused conversation that already has an owner' do
+          allow(Rails.configuration.dispatcher).to receive(:dispatch)
+          inbox.update!(lock_to_single_conversation: true)
+          other_agent = create(:user, account: account, role: :agent)
+          create(:inbox_member, user: other_agent, inbox: inbox)
+          existing = create(:conversation, account: account, inbox: inbox, contact: contact,
+                                           contact_inbox: contact_inbox, assignee: other_agent)
+
+          post "/api/v1/accounts/#{account.id}/conversations",
+               headers: agent.create_new_auth_token,
+               params: { source_id: contact_inbox.source_id, assignee_id: agent.id, message: { content: 'oi' } },
+               as: :json
+
+          expect(existing.reload.assignee_id).to eq(other_agent.id)
+        end
+
         it 'does not create a new conversation if source_id is not unique' do
           new_contact = create(:contact, account: account)
 

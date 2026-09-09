@@ -40,6 +40,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
   def create
     ActiveRecord::Base.transaction do
       @conversation = ConversationBuilder.new(params: params, contact_inbox: @contact_inbox).perform
+      honor_requested_assignee
       Messages::MessageBuilder.new(Current.user, @conversation, params[:message]).perform if params[:message].present?
     end
   end
@@ -251,6 +252,19 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
       source_id: params[:source_id],
       hmac_verified: hmac_verified?
     ).perform
+  end
+
+  # Fork Valcenter: ao iniciar/enviar pela aba Contatos, o front manda o agente
+  # logado em `assignee_id`. O ConversationBuilder aplica isso ao CRIAR, mas quando
+  # REUSA uma conversa existente (lock_to_single_conversation=true), o assignee era
+  # ignorado — então quase toda conversa "nova" pra contato com histórico nascia
+  # sem dono. Aqui garantimos que o agente vira o responsável se a conversa estiver
+  # SEM dono (não rouba conversa já atribuída a outro agente).
+  def honor_requested_assignee
+    return if params[:assignee_id].blank?
+    return if @conversation.assignee_id.present?
+
+    @conversation.update!(assignee_id: params[:assignee_id])
   end
 
   def conversation_finder
