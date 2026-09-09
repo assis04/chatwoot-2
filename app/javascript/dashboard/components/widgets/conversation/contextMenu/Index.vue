@@ -75,6 +75,10 @@ export default {
       type: Array,
       default: () => [],
     },
+    assigneeId: {
+      type: Number,
+      default: null,
+    },
   },
   emits: [
     'updateConversation',
@@ -423,7 +427,10 @@ export default {
           <MenuItem
             v-for="agent in assignableAgents"
             :key="agent.id"
-            :option="generateMenuLabelConfig(agent, 'agent')"
+            :option="{
+              ...generateMenuLabelConfig(agent, 'agent'),
+              checked: agent.id === assigneeId,
+            }"
             variant="agent"
             @click.stop="$emit('assignAgent', agent)"
           />

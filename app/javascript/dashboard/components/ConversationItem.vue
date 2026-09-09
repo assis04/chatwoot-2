@@ -274,6 +274,7 @@ const onToggleParticipant = agent => {
       :conversation-labels="source.labels"
       :conversation-url="conversationPath"
       :participant-ids="participantIds"
+      :assignee-id="assignee.id || null"
       @update-conversation="onUpdateConversation"
       @assign-agent="onAssignAgent"
       @assign-label="onAssignLabel"
