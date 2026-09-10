@@ -38,9 +38,27 @@ class Attachment < ApplicationRecord
   ].freeze
   ACCEPTABLE_FILE_EXTENSIONS = %w[pfx xml].freeze
   GENERIC_FILE_CONTENT_TYPES = %w[application/octet-stream].freeze
+
+  # Fork Valcenter: clients externos (Evolution/WhatsApp via Baileys) deduzem o
+  # mimetype da mídia pela EXTENSÃO do arquivo, não pelo content_type. Uma imagem
+  # com extensão válida porém incomum (.jfif — o que Windows/alguns navegadores
+  # geram ao salvar JPEG) não está no mapa de mimes → vira `mimetype: false` →
+  # imageMessage malformada → o WhatsApp descarta em silêncio (fica PENDING, some
+  # pro cliente). Normalizamos a extensão do blob de imagem pro canônico do
+  # content_type antes de o data_url ser exposto.
+  CANONICAL_IMAGE_EXT = {
+    'image/jpeg' => 'jpg',
+    'image/pjpeg' => 'jpg',
+    'image/png' => 'png',
+    'image/webp' => 'webp',
+    'image/gif' => 'gif'
+  }.freeze
+  SAFE_IMAGE_EXTENSIONS = %w[jpg jpeg png webp gif].freeze
+
   belongs_to :account
   belongs_to :message
   has_one_attached :file
+  before_save :normalize_image_filename
   before_save :set_extension
   validate :acceptable_file
   validates :external_url, length: { maximum: Limits::URL_LENGTH_LIMIT }
@@ -174,6 +192,24 @@ class Attachment < ApplicationRecord
     return true if message.inbox.instagram_direct?
 
     message.inbox.instagram? && message.conversation&.additional_attributes&.dig('type') == 'instagram_direct_message'
+  end
+
+  # Renomeia o blob de imagem pra extensão canônica do content_type quando a
+  # extensão atual não é uma que os clients reconhecem (ex: .jfif -> .jpg). É só
+  # metadata do blob (o arquivo armazenado não muda), então é seguro e idempotente.
+  def normalize_image_filename
+    return unless file.attached?
+
+    blob = file.blob
+    return if blob.blank?
+
+    canonical = CANONICAL_IMAGE_EXT[blob.content_type]
+    return if canonical.blank?
+
+    current_ext = File.extname(blob.filename.to_s).delete_prefix('.').downcase
+    return if SAFE_IMAGE_EXTENSIONS.include?(current_ext)
+
+    blob.update!(filename: "#{blob.filename.base}.#{canonical}")
   end
 
   def set_extension

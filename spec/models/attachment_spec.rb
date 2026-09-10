@@ -285,6 +285,48 @@ RSpec.describe Attachment do
     end
   end
 
+  describe 'normalize_image_filename' do
+    it 'renames a .jfif image to .jpg (extensão que clients externos não reconhecem)' do
+      attachment = message.attachments.new(account_id: message.account_id, file_type: :image)
+      attachment.file.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'foto.jfif', content_type: 'image/jpeg')
+      attachment.save!
+
+      expect(attachment.file.blob.filename.to_s).to eq('foto.jpg')
+    end
+
+    it 'keeps a canonical .jpg image untouched' do
+      attachment = message.attachments.new(account_id: message.account_id, file_type: :image)
+      attachment.file.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'foto.jpg', content_type: 'image/jpeg')
+      attachment.save!
+
+      expect(attachment.file.blob.filename.to_s).to eq('foto.jpg')
+    end
+
+    it 'keeps a .png image untouched' do
+      attachment = message.attachments.new(account_id: message.account_id, file_type: :image)
+      attachment.file.attach(io: Rails.root.join('spec/assets/avatar.png').open, filename: 'foto.png', content_type: 'image/png')
+      attachment.save!
+
+      expect(attachment.file.blob.filename.to_s).to eq('foto.png')
+    end
+
+    it 'does not touch non-image files' do
+      attachment = message.attachments.new(account_id: message.account_id, file_type: :file)
+      attachment.file.attach(io: StringIO.new('fake pdf'), filename: 'documento.pdf', content_type: 'application/pdf')
+      attachment.save!
+
+      expect(attachment.file.blob.filename.to_s).to eq('documento.pdf')
+    end
+
+    it 'does not touch image content types without a canonical mapping' do
+      attachment = message.attachments.new(account_id: message.account_id, file_type: :image)
+      attachment.file.attach(io: StringIO.new('<svg/>'), filename: 'icone.svg', content_type: 'image/svg+xml')
+      attachment.save!
+
+      expect(attachment.file.blob.filename.to_s).to eq('icone.svg')
+    end
+  end
+
   describe 'push_event_data includes extension and content_type' do
     it 'returns extension and content_type for file attachments' do
       attachment = message.attachments.new(account_id: message.account_id, file_type: :file)
