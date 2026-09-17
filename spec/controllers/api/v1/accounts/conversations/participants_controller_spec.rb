@@ -101,6 +101,39 @@ RSpec.describe 'Conversation Participants API', type: :request do
         )
       end
     end
+
+    context 'when the account uses department visibility (Digisac mode)' do
+      let(:non_member) { create(:user, account: account, role: :agent) }
+
+      before do
+        account.update!(custom_attributes: { 'department_visibility_enabled' => true })
+      end
+
+      it 'adds an account agent who is not a member of the inbox' do
+        params = { user_ids: [non_member.id] }
+
+        post api_v1_account_conversation_participants_url(account_id: account.id, conversation_id: conversation.display_id),
+             params: params,
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:success)
+        expect(response.body).to include(non_member.email)
+        expect(conversation.conversation_participants.pluck(:user_id)).to include(non_member.id)
+      end
+
+      it 'still rejects users from another account' do
+        params = { user_ids: [foreign_participant.id] }
+
+        post api_v1_account_conversation_participants_url(account_id: account.id, conversation_id: conversation.display_id),
+             params: params,
+             headers: agent.create_new_auth_token,
+             as: :json
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(conversation.conversation_participants).to be_empty
+      end
+    end
   end
 
   describe 'PUT /api/v1/accounts/{account.id}/conversations/<id>/participants' do

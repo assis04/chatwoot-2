@@ -59,10 +59,25 @@ class Api::V1::Accounts::Conversations::ParticipantsController < Api::V1::Accoun
   end
 
   def validate_participant_ids
-    invalid_ids = participants_to_be_added_ids - @conversation.inbox.assignable_agents.map(&:id)
+    invalid_ids = participants_to_be_added_ids - allowed_participant_ids
     return if invalid_ids.empty?
 
     render json: { error: 'Invalid participant IDs' }, status: :unprocessable_entity
+  end
+
+  # Fork Valcenter: em modo Digisac (department_visibility_enabled) qualquer agente
+  # da CONTA pode participar de qualquer conversa, independente de ser membro da
+  # caixa — espelha o Api::V1::Accounts::AssignableAgentsController#index, que já
+  # oferece todos os agentes no seletor. Sem esse alinhamento o seletor lista o
+  # agente mas o backend barra com 422 "Invalid participant IDs". Fora do modo
+  # Digisac mantém o padrão do Chatwoot (membros da caixa + admins). A fronteira
+  # entre contas continua: só agentes de Current.account entram.
+  def allowed_participant_ids
+    if Current.account.custom_attributes.is_a?(Hash) && Current.account.custom_attributes['department_visibility_enabled']
+      Current.account.users.pluck(:id)
+    else
+      @conversation.inbox.assignable_agents.map(&:id)
+    end
   end
 
   def notify_unread_count_change
