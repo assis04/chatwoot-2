@@ -300,6 +300,27 @@ describe('createConversationPayload', () => {
 
     expect(payload.has('additional_attributes[mail_subject]')).toBe(false);
   });
+
+  // Fork Valcenter: botão "Abrir conversa" da aba Contatos cria sem mensagem e
+  // sem dono — o assignee_id não pode ser anexado (senão viraria "undefined").
+  it('omits message and assignee_id when creating an empty, ownerless conversation', () => {
+    const options = {
+      params: {
+        inboxId: '1',
+        sourceId: '12',
+        contactId: '23',
+      },
+      contactId: '23',
+    };
+
+    const payload = createConversationPayload(options);
+
+    expect(payload.has('message[content]')).toBe(false);
+    expect(payload.has('assignee_id')).toBe(false);
+    expect(payload.get('inbox_id')).toBe(options.params.inboxId);
+    expect(payload.get('contact_id')).toBe(options.contactId);
+    expect(payload.get('source_id')).toBe(options.params.sourceId);
+  });
 });
 
 describe('createWhatsAppConversationPayload', () => {

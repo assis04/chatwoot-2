@@ -8,6 +8,7 @@ import Button from 'dashboard/components-next/button/Button.vue';
 import Breadcrumb from 'dashboard/components-next/breadcrumb/Breadcrumb.vue';
 import ComposeConversation from 'dashboard/components-next/NewConversation/ComposeConversation.vue';
 import VoiceCallButton from 'dashboard/components-next/Contacts/VoiceCallButton.vue';
+import OpenConversationButton from 'dashboard/components-next/Contacts/OpenConversationButton.vue';
 
 const props = defineProps({
   selectedContact: {
@@ -105,6 +106,15 @@ const closeMobileSidebar = () => {
                 :contact-id="contactId"
                 :label="$t('CONTACT_PANEL.CALL')"
                 size="sm"
+              />
+              <OpenConversationButton
+                :contact-id="contactId"
+                :label="$t('CONTACTS_LAYOUT.HEADER.OPEN_CONVERSATION')"
+                variant="solid"
+                color="slate"
+                size="sm"
+                icon="i-lucide-messages-square"
+                dropdown-class="ltr:right-0 rtl:left-0 top-10 max-h-56 w-fit max-w-sm"
               />
               <ComposeConversation :contact-id="contactId">
                 <template #trigger>

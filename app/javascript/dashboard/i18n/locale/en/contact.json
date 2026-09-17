@@ -299,6 +299,7 @@
       "SEARCH_PLACEHOLDER": "Search...",
       "MESSAGE_BUTTON": "Message",
       "SEND_MESSAGE": "Send message",
+      "OPEN_CONVERSATION": "Open conversation",
       "BLOCK_CONTACT": "Block contact",
       "UNBLOCK_CONTACT": "Unblock contact",
       "BREADCRUMB": {
@@ -412,6 +413,11 @@
         "MORE_FILTERS": "+ {count} more filters",
         "CLEAR_FILTERS": "Clear filters"
       }
+    },
+    "OPEN_CONVERSATION": {
+      "BUTTON": "Open conversation",
+      "NO_INBOX": "This contact has no channel to open a conversation.",
+      "ERROR": "Could not open the conversation. Please try again."
     },
     "CARD": {
       "OF": "of",

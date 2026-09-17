@@ -28,7 +28,12 @@ export const createConversationPayload = ({ params, contactId, files }) => {
   if (mailSubject) {
     payload.append('additional_attributes[mail_subject]', mailSubject);
   }
-  payload.append('assignee_id', assigneeId);
+  // Só atribui quando um agente foi explicitamente pedido. Sem isso, o FormData
+  // serializava `undefined` como a string "undefined" e a conversa nunca nascia
+  // realmente sem dono (usado pelo botão "Abrir conversa" da aba Contatos).
+  if (assigneeId) {
+    payload.append('assignee_id', assigneeId);
+  }
 
   return payload;
 };

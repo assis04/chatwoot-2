@@ -8,6 +8,7 @@ import Button from 'dashboard/components-next/button/Button.vue';
 import Avatar from 'dashboard/components-next/avatar/Avatar.vue';
 import Flag from 'dashboard/components-next/flag/Flag.vue';
 import ContactDeleteSection from 'dashboard/components-next/Contacts/ContactsCard/ContactDeleteSection.vue';
+import OpenConversationButton from 'dashboard/components-next/Contacts/OpenConversationButton.vue';
 import Checkbox from 'dashboard/components-next/checkbox/Checkbox.vue';
 import countries from 'shared/constants/countries';
 
@@ -189,6 +190,8 @@ const handleAvatarHover = isHovered => {
               size="xs"
               @click="onClickViewDetails"
             />
+            <div class="w-px h-3 truncate bg-n-slate-6" />
+            <OpenConversationButton :contact-id="id" color="blue" @click.stop />
           </div>
         </div>
       </div>

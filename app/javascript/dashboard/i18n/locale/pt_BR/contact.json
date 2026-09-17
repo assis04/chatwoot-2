@@ -298,6 +298,7 @@
       "SEARCH_PLACEHOLDER": "Pesquisar...",
       "MESSAGE_BUTTON": "Enviar Mensagem",
       "SEND_MESSAGE": "Enviar mensagem",
+      "OPEN_CONVERSATION": "Abrir conversa",
       "BLOCK_CONTACT": "Bloquear contato",
       "UNBLOCK_CONTACT": "Desbloquear contato",
       "BREADCRUMB": {
@@ -411,6 +412,11 @@
         "MORE_FILTERS": "+ {count} mais filtros",
         "CLEAR_FILTERS": "Limpar filtros"
       }
+    },
+    "OPEN_CONVERSATION": {
+      "BUTTON": "Abrir conversa",
+      "NO_INBOX": "Este contato não tem número/caixa para abrir uma conversa.",
+      "ERROR": "Não foi possível abrir a conversa. Tente novamente."
     },
     "CARD": {
       "OF": "de",
