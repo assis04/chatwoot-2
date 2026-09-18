@@ -37,7 +37,25 @@ class ConversationParticipant < ApplicationRecord
   end
 
   def ensure_inbox_access
-    errors.add(:user, 'must have inbox access') if conversation && conversation.inbox.assignable_agents.exclude?(user)
+    return unless conversation
+
+    # Fork Valcenter: em modo Digisac (department_visibility_enabled) qualquer
+    # agente da conta pode participar de qualquer conversa, independente de ser
+    # membro da caixa — espelha o ParticipantsController#allowed_participant_ids
+    # e o AssignableAgentsController#index. Sem isto o seletor lista o agente, o
+    # controller aceita, mas esta validacao do model rejeita ("must have inbox
+    # access"). A fronteira entre contas continua: so agentes da propria conta.
+    if department_visibility_enabled?
+      errors.add(:user, 'must have inbox access') unless conversation.account.users.exists?(id: user_id)
+      return
+    end
+
+    errors.add(:user, 'must have inbox access') if conversation.inbox.assignable_agents.exclude?(user)
+  end
+
+  def department_visibility_enabled?
+    ca = conversation.account.custom_attributes
+    ca.is_a?(Hash) && ca['department_visibility_enabled']
   end
 
   def invalidate_filtered_unread_count_visibility
