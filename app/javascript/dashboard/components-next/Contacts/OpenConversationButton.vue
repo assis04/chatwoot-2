@@ -7,14 +7,18 @@
  * mostra um dropdown para escolher o número. A criação NÃO manda mensagem nem
  * assignee — a conversa nasce sem dono. Com `lock_to_single_conversation=true`
  * (caixas Evolution), o backend reusa a conversa existente do contato naquele
- * número em vez de duplicar. Depois navega direto para a conversa.
+ * número em vez de duplicar. Antes de navegar, adiciona o próprio agente como
+ * participante (watcher) — sem isso, uma conversa sem dono é invisível a agentes
+ * com a função "participando" e o app volta pra tela principal. Depois navega
+ * direto para a conversa.
  */
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRouter } from 'vue-router';
 import { vOnClickOutside } from '@vueuse/components';
-import { useStore } from 'dashboard/composables/store';
+import { useStore, useMapGetter } from 'dashboard/composables/store';
 import { useAlert } from 'dashboard/composables';
+import ConversationApi from 'dashboard/api/inbox/conversation';
 import {
   fetchContactableInboxes,
   buildContactableInboxesList,
@@ -40,6 +44,7 @@ const props = defineProps({
 const { t } = useI18n();
 const store = useStore();
 const router = useRouter();
+const currentUser = useMapGetter('getCurrentUser');
 
 const isLoading = ref(false);
 const showDropdown = ref(false);
@@ -57,6 +62,22 @@ const openConversation = async inbox => {
         contactId: Number(props.contactId),
       },
     });
+    // A conversa nasce SEM DONO. Pra um agente com a função "participando"
+    // (conversation_participating_manage) ela seria invisivel (ConversationPolicy#show?
+    // exige assignee OU participante) e o app voltaria pra tela principal. Incluir
+    // o proprio agente como participante torna a conversa visivel pra ele em
+    // qualquer funcao, mantendo-a sem dono. Best-effort: nao bloqueia a navegacao.
+    const userId = currentUser.value?.id;
+    if (userId) {
+      try {
+        await ConversationApi.addParticipants({
+          conversationId: data.id,
+          userIds: [userId],
+        });
+      } catch (error) {
+        // silencioso: no pior caso o agente vê o mesmo comportamento de antes
+      }
+    }
     await router.push(
       `/app/accounts/${data.account_id}/conversations/${data.id}`
     );

@@ -130,6 +130,15 @@ class ConversationApi extends ApiClient {
     });
   }
 
+  // Aditivo: adiciona participantes sem remover os existentes (o create do
+  // ParticipantsController so faz find_or_create dos novos). Usado pelo botao
+  // "Abrir conversa" pra incluir o proprio agente como participante.
+  addParticipants({ conversationId, userIds }) {
+    return axios.post(`${this.url}/${conversationId}/participants`, {
+      user_ids: userIds,
+    });
+  }
+
   getAllAttachments(conversationId) {
     return axios.get(`${this.url}/${conversationId}/attachments`);
   }
