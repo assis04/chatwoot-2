@@ -41,6 +41,7 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     ActiveRecord::Base.transaction do
       @conversation = ConversationBuilder.new(params: params, contact_inbox: @contact_inbox).perform
       honor_requested_assignee
+      ensure_creator_can_view
       Messages::MessageBuilder.new(Current.user, @conversation, params[:message]).perform if params[:message].present?
     end
   end
@@ -265,6 +266,23 @@ class Api::V1::Accounts::ConversationsController < Api::V1::Accounts::BaseContro
     return if @conversation.assignee_id.present?
 
     @conversation.update!(assignee_id: params[:assignee_id])
+  end
+
+  # Fork Valcenter: quando a conversa é criada/reusada SEM dono (ex.: botão "Abrir
+  # conversa" da aba Contatos, que abre sem atribuir ninguém), um agente com função
+  # restritiva ("participando" / conversation_participating_manage) não conseguiria
+  # VÊ-LA — o ConversationPolicy#show? exige assignee OU participante, então o app
+  # voltava pra tela principal. O front NÃO pode se auto-adicionar como participante
+  # (o ParticipantsController exige show? na conversa, que o agente ainda não tem →
+  # 401, um catch-22). Aqui, no create (contexto do criador já autorizado a criar na
+  # caixa), incluímos o próprio criador como participante quando a conversa ficou sem
+  # dono. Torna a conversa visível pra ele em qualquer função, mantendo-a SEM DONO.
+  # Idempotente; não roda pra AgentBot nem quando já há assignee (aí ele já vê).
+  def ensure_creator_can_view
+    return unless Current.user.is_a?(User)
+    return if @conversation.assignee_id.present?
+
+    @conversation.conversation_participants.find_or_create_by!(user_id: Current.user.id)
   end
 
   def conversation_finder

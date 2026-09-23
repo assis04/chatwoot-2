@@ -480,6 +480,39 @@ RSpec.describe 'Conversations API', type: :request do
           expect(existing.reload.assignee_id).to eq(other_agent.id)
         end
 
+        # Fork Valcenter: botão "Abrir conversa" cria SEM dono; o backend adiciona o
+        # criador como participante pra ele conseguir ver a conversa (funções
+        # restritivas "participando" exigem assignee OU participante).
+        it 'adds the requesting agent as participant when the conversation has no owner' do
+          allow(Rails.configuration.dispatcher).to receive(:dispatch)
+          post "/api/v1/accounts/#{account.id}/conversations",
+               headers: agent.create_new_auth_token,
+               params: { source_id: contact_inbox.source_id },
+               as: :json
+
+          expect(response).to have_http_status(:success)
+          response_data = JSON.parse(response.body, symbolize_names: true)
+          conversation = account.conversations.find_by(display_id: response_data[:id])
+          expect(conversation.assignee_id).to be_nil
+          expect(conversation.conversation_participants.pluck(:user_id)).to include(agent.id)
+        end
+
+        it 'does not add the requesting agent as participant when the conversation is assigned to someone else' do
+          allow(Rails.configuration.dispatcher).to receive(:dispatch)
+          other_agent = create(:user, account: account, role: :agent)
+          create(:inbox_member, user: other_agent, inbox: inbox)
+
+          post "/api/v1/accounts/#{account.id}/conversations",
+               headers: agent.create_new_auth_token,
+               params: { source_id: contact_inbox.source_id, assignee_id: other_agent.id },
+               as: :json
+
+          expect(response).to have_http_status(:success)
+          response_data = JSON.parse(response.body, symbolize_names: true)
+          conversation = account.conversations.find_by(display_id: response_data[:id])
+          expect(conversation.conversation_participants.pluck(:user_id)).not_to include(agent.id)
+        end
+
         it 'does not create a new conversation if source_id is not unique' do
           new_contact = create(:contact, account: account)
 
