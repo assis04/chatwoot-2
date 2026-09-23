@@ -175,6 +175,24 @@ describe Webhooks::Trigger do
     end
   end
 
+  # Fork Valcenter (hardening/LGPD): a linha de log de falha nao pode vazar a
+  # key/secret da querystring da URL do webhook.
+  describe 'secret filtering in failure logs' do
+    let(:webhook_type) { :account_webhook }
+
+    it 'masks key/secret query params in the warning log' do
+      secret_url = 'http://crm.example.com/api/public/chat/inbound?key=SUPERSECRETKEY&foo=1'
+      allow(SafeFetch).to receive(:fetch).and_raise(SafeFetch::HttpError.new('404 Not Found'))
+
+      expect(Rails.logger).to receive(:warn) do |msg|
+        expect(msg).to include('key=[FILTERED]')
+        expect(msg).not_to include('SUPERSECRETKEY')
+      end
+
+      trigger.execute(secret_url, { event: 'ping' }, webhook_type)
+    end
+  end
+
   describe 'request headers' do
     let(:payload) { { event: 'message_created' } }
     let(:body) { payload.to_json }

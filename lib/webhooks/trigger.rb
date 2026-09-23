@@ -33,10 +33,17 @@ class Webhooks::Trigger
 
   def handle_failure(error)
     handle_error(error)
-    Rails.logger.warn "Exception: Invalid webhook URL #{@url} : #{error.message}"
+    Rails.logger.warn "Exception: Invalid webhook URL #{filter_secrets(@url)} : #{filter_secrets(error.message)}"
   end
 
   private
+
+  # Fork Valcenter (hardening/LGPD): nao vaza key/secret/token/apikey da
+  # querystring nos logs de falha de webhook. Aplicado tanto na URL quanto na
+  # mensagem de erro (que pode ecoar a URL).
+  def filter_secrets(value)
+    value.to_s.gsub(/([?&](?:key|token|secret|api_key|apikey|access_token)=)[^&\s]+/i, '\1[FILTERED]')
+  end
 
   def perform_request
     body = @payload.to_json
