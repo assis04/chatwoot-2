@@ -159,27 +159,21 @@ class ConversationFinder
   def filter_by_query
     return unless params[:q]
 
-    # Fork Valcenter: busca da lista de conversas NO SERVIDOR. Antes era client-side
-    # (filtrava so as conversas ja carregadas) -> com o default "Todas" virava um loop
-    # de paginacao infinita. Casa por NOME/telefone/email/identifier do CONTATO (como
-    # os agentes buscam) OU conteudo de mensagem. contacts.name/phone_number tem indice
-    # GIN trigram -> ILIKE '%termo%' e rapido. O subquery de mensagens entra uma vez
-    # (sem carregar mensagem), preservando o fix de perf anterior. Tudo gated no q:
-    # sem busca, este metodo retorna cedo e o fetch normal da lista nao muda.
+    # Fork Valcenter: busca da lista de conversas NO SERVIDOR (antes era client-side,
+    # que so filtrava as conversas ja carregadas -> com o default "Todas" virava um loop
+    # de paginacao infinita). Casa SO por CONTATO (nome/telefone/email/identifier) — que
+    # e como os agentes buscam. NAO casa conteudo de mensagem de proposito: buscar por
+    # nome e trazer conversas onde alguem *digitou* aquele nome numa mensagem confunde
+    # (resultado que "nao faz sentido"). contacts.name/phone_number tem indice GIN
+    # trigram -> ILIKE '%termo%' e rapido. Tudo gated no q: sem busca, retorna cedo e
+    # o fetch normal da lista nao muda. (Busca por conteudo = a busca global, Cmd+K.)
     search = "%#{params[:q]}%"
-    allowed_message_types = [Message.message_types[:incoming], Message.message_types[:outgoing]]
-    message_conversation_ids = current_account.messages
-                                              .where(message_type: allowed_message_types)
-                                              .where('messages.content ILIKE ?', search)
-                                              .select(:conversation_id)
     contacts = Contact.arel_table
-    conversations = Conversation.arel_table
     @conversations = @conversations.joins(:contact).where(
       contacts[:name].matches(search)
         .or(contacts[:email].matches(search))
         .or(contacts[:phone_number].matches(search))
         .or(contacts[:identifier].matches(search))
-        .or(conversations[:id].in(message_conversation_ids.arel))
     )
   end
 

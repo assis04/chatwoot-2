@@ -80,9 +80,12 @@ const onSearchInput = event => {
   const value = event.target.value;
   searchQuery.value = value;
   clearTimeout(searchDebounceTimer);
+  // Fork Valcenter: 500ms (nao 200) — a busca agora e server-side (refaz o fetch da
+  // lista). Com debounce curto, o fetch disparava no meio da digitacao e travava o
+  // input ("nao consigo terminar de escrever"). 500ms so busca depois que voce para.
   searchDebounceTimer = setTimeout(() => {
     debouncedSearchQuery.value = value.trim().toLowerCase();
-  }, 200);
+  }, 500);
 };
 const clearSearch = () => {
   searchQuery.value = '';
