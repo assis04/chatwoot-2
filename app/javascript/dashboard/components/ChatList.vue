@@ -276,6 +276,8 @@ const conversationFilters = computed(() => {
     labels: props.label ? [props.label] : undefined,
     teamId: props.teamId || undefined,
     conversationType: props.conversationType || undefined,
+    // Fork Valcenter: termo de busca vai pro backend (server-side search).
+    q: debouncedSearchQuery.value || undefined,
   };
 });
 
@@ -380,28 +382,10 @@ const conversationList = computed(() => {
     });
   }
 
-  // Chatcenter custom: inline search across contact name and last message
-  if (debouncedSearchQuery.value) {
-    const q = debouncedSearchQuery.value;
-    localConversationList = localConversationList.filter(conversation => {
-      const senderName =
-        conversation?.meta?.sender?.name?.toLowerCase?.() || '';
-      const senderEmail =
-        conversation?.meta?.sender?.email?.toLowerCase?.() || '';
-      const senderPhone =
-        conversation?.meta?.sender?.phone_number?.toLowerCase?.() || '';
-      const messages = conversation?.messages || [];
-      const lastMessage = messages.length
-        ? messages[messages.length - 1]?.content?.toLowerCase?.() || ''
-        : '';
-      return (
-        senderName.includes(q) ||
-        senderEmail.includes(q) ||
-        senderPhone.includes(q) ||
-        lastMessage.includes(q)
-      );
-    });
-  }
+  // Fork Valcenter: a busca agora e SERVER-SIDE (via `q` em conversationFilters ->
+  // backend filter_by_query). O filtro client-side foi removido porque, com o default
+  // "Todas", ele so via as conversas ja carregadas e forcava paginacao infinita ate
+  // varrer a lista inteira. O watch de debouncedSearchQuery refaz o fetch no servidor.
 
   if (
     !hasAppliedFiltersOrActiveFolders.value &&
@@ -937,6 +921,12 @@ watch(conversationFilters, (newVal, oldVal) => {
   if (newVal !== oldVal) {
     store.dispatch('updateChatListFilters', newVal);
   }
+});
+
+// Fork Valcenter: busca server-side — ao mudar o termo (ja com debounce de 200ms),
+// reseta a paginacao e refaz o fetch com `q`, em vez de filtrar a lista em memoria.
+watch(debouncedSearchQuery, () => {
+  resetAndFetchData();
 });
 </script>
 

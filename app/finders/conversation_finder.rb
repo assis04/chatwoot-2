@@ -159,18 +159,28 @@ class ConversationFinder
   def filter_by_query
     return unless params[:q]
 
-    # Fork Valcenter (perf): a versao antiga fazia joins(:messages) + includes(:messages)
-    # e ainda chamava o metodo `conversations` (que pagina/ordena/eager-load de avatar)
-    # NO MEIO do filtro — multiplicava linha por mensagem casada, carregava TODAS as
-    # mensagens de cada conversa so pra listar, e forcava o count pelo caminho lento
-    # (legacy). Trocado por um semi-join via subquery de IDs: cada conversa entra uma
-    # vez, nenhuma mensagem e carregada, e o count volta a usar o pick de uma passada.
+    # Fork Valcenter: busca da lista de conversas NO SERVIDOR. Antes era client-side
+    # (filtrava so as conversas ja carregadas) -> com o default "Todas" virava um loop
+    # de paginacao infinita. Casa por NOME/telefone/email/identifier do CONTATO (como
+    # os agentes buscam) OU conteudo de mensagem. contacts.name/phone_number tem indice
+    # GIN trigram -> ILIKE '%termo%' e rapido. O subquery de mensagens entra uma vez
+    # (sem carregar mensagem), preservando o fix de perf anterior. Tudo gated no q:
+    # sem busca, este metodo retorna cedo e o fetch normal da lista nao muda.
+    search = "%#{params[:q]}%"
     allowed_message_types = [Message.message_types[:incoming], Message.message_types[:outgoing]]
-    matching_conversation_ids = current_account.messages
-                                               .where(message_type: allowed_message_types)
-                                               .where('messages.content ILIKE :search', search: "%#{params[:q]}%")
-                                               .select(:conversation_id)
-    @conversations = @conversations.where(id: matching_conversation_ids)
+    message_conversation_ids = current_account.messages
+                                              .where(message_type: allowed_message_types)
+                                              .where('messages.content ILIKE ?', search)
+                                              .select(:conversation_id)
+    contacts = Contact.arel_table
+    conversations = Conversation.arel_table
+    @conversations = @conversations.joins(:contact).where(
+      contacts[:name].matches(search)
+        .or(contacts[:email].matches(search))
+        .or(contacts[:phone_number].matches(search))
+        .or(contacts[:identifier].matches(search))
+        .or(conversations[:id].in(message_conversation_ids.arel))
+    )
   end
 
   def filter_by_status
