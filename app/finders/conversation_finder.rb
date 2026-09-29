@@ -159,11 +159,18 @@ class ConversationFinder
   def filter_by_query
     return unless params[:q]
 
+    # Fork Valcenter (perf): a versao antiga fazia joins(:messages) + includes(:messages)
+    # e ainda chamava o metodo `conversations` (que pagina/ordena/eager-load de avatar)
+    # NO MEIO do filtro — multiplicava linha por mensagem casada, carregava TODAS as
+    # mensagens de cada conversa so pra listar, e forcava o count pelo caminho lento
+    # (legacy). Trocado por um semi-join via subquery de IDs: cada conversa entra uma
+    # vez, nenhuma mensagem e carregada, e o count volta a usar o pick de uma passada.
     allowed_message_types = [Message.message_types[:incoming], Message.message_types[:outgoing]]
-    @conversations = conversations.joins(:messages).where('messages.content ILIKE :search', search: "%#{params[:q]}%")
-                                  .where(messages: { message_type: allowed_message_types }).includes(:messages)
-                                  .where('messages.content ILIKE :search', search: "%#{params[:q]}%")
-                                  .where(messages: { message_type: allowed_message_types })
+    matching_conversation_ids = current_account.messages
+                                               .where(message_type: allowed_message_types)
+                                               .where('messages.content ILIKE :search', search: "%#{params[:q]}%")
+                                               .select(:conversation_id)
+    @conversations = @conversations.where(id: matching_conversation_ids)
   end
 
   def filter_by_status
