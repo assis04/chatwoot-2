@@ -13,11 +13,22 @@ class InboxPolicy < ApplicationPolicy
     def resolve
       # ATENÇÃO: este scope alimenta O ÚNICO endpoint GET /inboxes, que popula o
       # store `inboxes` usado no MENU/sidebar e nas conversas — não só nas
-      # Configurações. Ampliar aqui vaza o nome de todas as caixas pro menu do
-      # agente. Por isso a visibilidade da LISTA é sempre "as minhas"
-      # (assigned_inboxes); um gestor inbox_manage ainda pode ABRIR/gerenciar uma
-      # caixa específica via InboxPolicy#show?/update?/manage_members?.
+      # Configurações. Ampliar pra um AGENTE comum vazaria o nome de todas as
+      # caixas pro menu dele — por isso o default continua "as minhas"
+      # (assigned_inboxes).
+      # Fork Valcenter: mas quem tem 'inbox_manage' (ou admin) PRECISA ver todas
+      # as caixas na lista pra gerenciá-las — senão nem acha as que não é membro.
+      # É um papel de gestão, então ver os nomes de todas é esperado (a
+      # visibilidade de CONVERSAS continua regida à parte, pelo PermissionFilter).
+      return account.inboxes if @account_user&.administrator? || inbox_manage?
+
       user.assigned_inboxes
+    end
+
+    private
+
+    def inbox_manage?
+      @account_user&.custom_role&.permissions&.include?('inbox_manage')
     end
   end
 
