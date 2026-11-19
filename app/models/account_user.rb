@@ -55,6 +55,12 @@ class AccountUser < ApplicationRecord
   end
 
   def remove_user_from_account
+    # Fork Valcenter: Account e User destroem os account_users via destroy_async,
+    # ou seja, DEPOIS que o pai ja saiu do banco. Ai `account` (ou `user`) vem nil
+    # e o job morria com NoMethodError. Nao ha o que limpar nesse caso: o proprio
+    # pai ja leva caixas, times, notification_settings e conversas no destroy dele.
+    return if account.blank? || user.blank?
+
     ::Agents::DestroyJob.perform_later(account, user)
   end
 

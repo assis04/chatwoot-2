@@ -41,6 +41,19 @@ RSpec.describe AccountUser do
 
       expect(user.assigned_conversations.count).to eq(0)
     end
+
+    # Account/User apagam os account_users via destroy_async, com o pai ja fora do banco.
+    it 'does not enqueue the agent cleanup when the account is already gone' do
+      allow(account_user).to receive(:account).and_return(nil)
+
+      expect { account_user.send(:remove_user_from_account) }.not_to have_enqueued_job(Agents::DestroyJob)
+    end
+
+    it 'does not enqueue the agent cleanup when the user is already gone' do
+      allow(account_user).to receive(:user).and_return(nil)
+
+      expect { account_user.send(:remove_user_from_account) }.not_to have_enqueued_job(Agents::DestroyJob)
+    end
   end
 
   describe 'filtered unread count invalidation' do
