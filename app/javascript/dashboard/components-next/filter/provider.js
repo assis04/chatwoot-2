@@ -157,6 +157,24 @@ export function useConversationFilterContext() {
       attributeModel: 'standard',
     },
     {
+      // Fork Valcenter: "Agente atribuido" e o dono de AGORA (resolver tira o
+      // dono). Este filtro pega tudo que o agente atendeu ou acompanha.
+      attributeKey: CONVERSATION_ATTRIBUTES.PARTICIPANT_ID,
+      value: CONVERSATION_ATTRIBUTES.PARTICIPANT_ID,
+      attributeName: t('FILTER.ATTRIBUTES.PARTICIPANT_NAME'),
+      label: t('FILTER.ATTRIBUTES.PARTICIPANT_NAME'),
+      inputType: 'searchSelect',
+      options: agents.value.map(agent => {
+        return {
+          id: agent.id,
+          name: agent.name,
+        };
+      }),
+      dataType: 'text',
+      filterOperators: equalityOperators.value,
+      attributeModel: 'standard',
+    },
+    {
       attributeKey: CONVERSATION_ATTRIBUTES.INBOX_ID,
       value: CONVERSATION_ATTRIBUTES.INBOX_ID,
       attributeName: t('FILTER.ATTRIBUTES.INBOX_NAME'),

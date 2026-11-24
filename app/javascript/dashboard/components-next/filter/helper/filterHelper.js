@@ -5,6 +5,8 @@ export const CONVERSATION_ATTRIBUTES = {
   STATUS: 'status',
   PRIORITY: 'priority',
   ASSIGNEE_ID: 'assignee_id',
+  // Fork Valcenter: ver Conversations::FilterService::PARTICIPANT_ATTRIBUTE.
+  PARTICIPANT_ID: 'participant_id',
   INBOX_ID: 'inbox_id',
   TEAM_ID: 'team_id',
   CONTACT_ID: 'contact_id',

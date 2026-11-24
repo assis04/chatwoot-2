@@ -244,6 +244,88 @@ describe('filterHelpers', () => {
       expect(matchesFilters(conversation, filters)).toBe(false);
     });
 
+    // Fork Valcenter: participant_id (agente participante)
+    describe('participant_id', () => {
+      const withParticipants = ids => ({
+        meta: { participants: ids.map(id => ({ id, name: `Agent ${id}` })) },
+      });
+      const participantFilter = (operator, values) => [
+        {
+          attribute_key: 'participant_id',
+          filter_operator: operator,
+          values,
+          query_operator: 'and',
+        },
+      ];
+
+      it('matches when the agent is one of the participants', () => {
+        expect(
+          matchesFilters(
+            withParticipants([3, 7]),
+            participantFilter('equal_to', { id: 7, name: 'Agent 7' })
+          )
+        ).toBe(true);
+      });
+
+      it('does not match when the agent is not a participant', () => {
+        expect(
+          matchesFilters(
+            withParticipants([3]),
+            participantFilter('equal_to', { id: 7, name: 'Agent 7' })
+          )
+        ).toBe(false);
+      });
+
+      it('matches array values from saved folders', () => {
+        expect(
+          matchesFilters(
+            withParticipants([3, 7]),
+            participantFilter('equal_to', [7])
+          )
+        ).toBe(true);
+      });
+
+      it('inverts the match with not_equal_to', () => {
+        const filter = participantFilter('not_equal_to', { id: 7 });
+        expect(matchesFilters(withParticipants([3, 7]), filter)).toBe(false);
+        expect(matchesFilters(withParticipants([3]), filter)).toBe(true);
+      });
+
+      it('treats a conversation without participants as no match', () => {
+        expect(
+          matchesFilters({ meta: {} }, participantFilter('equal_to', { id: 7 }))
+        ).toBe(false);
+        expect(
+          matchesFilters(
+            { meta: {} },
+            participantFilter('not_equal_to', { id: 7 })
+          )
+        ).toBe(true);
+      });
+
+      it('works combined with the resolved status of a former assignee', () => {
+        const resolvedWithoutOwner = {
+          status: 'resolved',
+          meta: { assignee: null, participants: [{ id: 7 }] },
+        };
+        const filters = [
+          {
+            attribute_key: 'status',
+            filter_operator: 'equal_to',
+            values: [{ id: 'all', name: 'all' }],
+            query_operator: 'and',
+          },
+          {
+            attribute_key: 'participant_id',
+            filter_operator: 'equal_to',
+            values: { id: 7, name: 'Agent 7' },
+            query_operator: null,
+          },
+        ];
+        expect(matchesFilters(resolvedWithoutOwner, filters)).toBe(true);
+      });
+    });
+
     it('should match conversation with equal_to operator for contact_id', () => {
       const conversation = { meta: { sender: { id: 42 } } };
       const filters = [

@@ -23,6 +23,16 @@ const filterTypes = [
     attributeModel: 'standard',
   },
   {
+    // Fork Valcenter: sem esta entrada, editar uma pasta salva com o filtro de
+    // participante quebra (customViewsHelper cai no caminho de atributo custom).
+    attributeKey: 'participant_id',
+    attributeI18nKey: 'PARTICIPANT_NAME',
+    inputType: 'search_select',
+    dataType: 'text',
+    filterOperators: OPERATOR_TYPES_1,
+    attributeModel: 'standard',
+  },
+  {
     attributeKey: 'priority',
     attributeI18nKey: 'PRIORITY',
     inputType: 'multi_select',

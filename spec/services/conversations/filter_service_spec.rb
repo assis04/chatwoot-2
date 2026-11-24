@@ -646,6 +646,86 @@ describe Conversations::FilterService do
     end
   end
 
+  # Fork Valcenter: filtro "Agente participante" (participant_id).
+  describe '#perform on participant filter' do
+    let!(:account) { create(:account) }
+    let!(:admin) { create(:user, account: account, role: :administrator) }
+    let!(:agent) { create(:user, account: account, role: :agent) }
+    let!(:other_agent) { create(:user, account: account, role: :agent) }
+    let!(:inbox) { create(:inbox, account: account, enable_auto_assignment: false) }
+    let!(:resolved_without_owner) { create(:conversation, account: account, inbox: inbox, status: :resolved) }
+    let!(:open_with_agent) { create(:conversation, account: account, inbox: inbox, status: :open) }
+    let!(:other_agent_only) { create(:conversation, account: account, inbox: inbox, status: :open) }
+    let(:params) { { payload: [], page: 1 } }
+
+    def participant_payload(operator, values, status: nil)
+      conditions = []
+      if status
+        conditions << { attribute_key: 'status', filter_operator: 'equal_to', values: [status],
+                        query_operator: 'AND', custom_attribute_type: '' }.with_indifferent_access
+      end
+      conditions << { attribute_key: 'participant_id', filter_operator: operator, values: values,
+                      query_operator: nil, custom_attribute_type: '' }.with_indifferent_access
+    end
+
+    before do
+      account.conversations.where.not(id: [resolved_without_owner, open_with_agent, other_agent_only].map(&:id)).destroy_all
+      create(:inbox_member, user: agent, inbox: inbox)
+      create(:inbox_member, user: other_agent, inbox: inbox)
+      create(:conversation_participant, conversation: resolved_without_owner, user: agent)
+      create(:conversation_participant, conversation: open_with_agent, user: agent)
+      create(:conversation_participant, conversation: open_with_agent, user: other_agent)
+      create(:conversation_participant, conversation: other_agent_only, user: other_agent)
+    end
+
+    it 'returns every conversation the agent took part in, including resolved ones without an owner' do
+      params[:payload] = participant_payload('equal_to', [agent.id], status: 'all')
+      result = filter_service.new(params, admin, account).perform
+
+      expect(result[:conversations].map(&:id)).to contain_exactly(resolved_without_owner.id, open_with_agent.id)
+      expect(result[:count][:all_count]).to eq 2
+    end
+
+    it 'excludes the agent conversations with not_equal_to' do
+      params[:payload] = participant_payload('not_equal_to', [agent.id], status: 'all')
+      result = filter_service.new(params, admin, account).perform
+
+      expect(result[:conversations].map(&:id)).to contain_exactly(other_agent_only.id)
+    end
+
+    it 'matches any of several agents without duplicating conversations' do
+      params[:payload] = participant_payload('equal_to', [agent.id, other_agent.id])
+      result = filter_service.new(params, admin, account).perform
+
+      expect(result[:conversations].map(&:id)).to contain_exactly(resolved_without_owner.id, open_with_agent.id, other_agent_only.id)
+    end
+
+    it 'rejects operators that the participant filter does not support' do
+      params[:payload] = participant_payload('is_present', [])
+
+      expect { filter_service.new(params, admin, account).perform }
+        .to raise_error(CustomExceptions::CustomFilter::InvalidOperator)
+    end
+
+    it 'rejects values that are not user ids' do
+      params[:payload] = participant_payload('equal_to', ['abc'])
+
+      expect { filter_service.new(params, admin, account).perform }
+        .to raise_error(CustomExceptions::CustomFilter::InvalidValue)
+    end
+
+    it 'still applies the permission filter for agents' do
+      restricted_inbox = create(:inbox, account: account)
+      hidden = create(:conversation, account: account, inbox: restricted_inbox)
+      create(:conversation_participant, conversation: hidden, user: admin)
+
+      params[:payload] = participant_payload('equal_to', [admin.id])
+      result = filter_service.new(params, agent, account).perform
+
+      expect(result[:conversations].map(&:id)).not_to include(hidden.id)
+    end
+  end
+
   describe '#base_relation' do
     let!(:account) { create(:account) }
     let!(:user_1) { create(:user, account: account, role: :agent) }

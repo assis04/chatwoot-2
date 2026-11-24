@@ -73,6 +73,13 @@ const getValueFromConversation = (conversation, attributeKey) => {
       return conversation.display_id || conversation.id;
     case 'assignee_id':
       return conversation.meta?.assignee?.id;
+    case 'participant_id':
+      // Fork Valcenter: espelha o EXISTS em conversation_participants do
+      // Conversations::FilterService. O meta.participants vem na lista e no
+      // push_meta do tempo real.
+      return (conversation.meta?.participants || []).map(
+        participant => participant.id
+      );
     case 'contact_id':
       return (
         conversation.meta?.sender?.id ||
@@ -146,6 +153,13 @@ const equalTo = (filterValue, conversationValue) => {
     if (!Array.isArray(conversationValue)) {
       return filterValue.includes(conversationValue);
     }
+  }
+
+  // Fork Valcenter: valor unico (searchSelect manda { id, name }) contra um
+  // atributo que e lista (participant_id) — casa se o valor esta na lista, como
+  // o `IN (...)` do servidor.
+  if (Array.isArray(conversationValue)) {
+    return conversationValue.includes(filterValue);
   }
 
   return conversationValue === filterValue;

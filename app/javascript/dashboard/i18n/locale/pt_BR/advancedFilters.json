@@ -49,6 +49,7 @@
     "ATTRIBUTES": {
       "STATUS": "Status",
       "ASSIGNEE_NAME": "Agente atribuído",
+      "PARTICIPANT_NAME": "Agente participante",
       "INBOX_NAME": "Caixa de Entrada",
       "TEAM_NAME": "Nome do Time",
       "CONTACT": "Contato",
