@@ -50,6 +50,7 @@ import {
   filterItemsByPermission,
 } from 'dashboard/helper/permissionsHelper.js';
 import { matchesFilters } from '../store/modules/conversations/helpers/filterHelpers';
+import { conversationMatchesSearch } from 'dashboard/helper/conversationSearch';
 import { CONVERSATION_EVENTS } from '../helper/AnalyticsHelper/events';
 import { ASSIGNEE_TYPE_TAB_PERMISSIONS } from 'dashboard/constants/permissions.js';
 
@@ -373,6 +374,14 @@ const conversationList = computed(() => {
       );
     } else {
       localConversationList = [...allChatList.value(filters)];
+    }
+    // Fork Valcenter: com busca ativa, so mostra o que casa com o termo. O store
+    // tambem guarda a conversa aberta e o que chega em tempo real, que nao vieram
+    // da busca do servidor (ver helper/conversationSearch.js).
+    if (filters.q) {
+      localConversationList = localConversationList.filter(conversation =>
+        conversationMatchesSearch(conversation, filters.q)
+      );
     }
   } else {
     localConversationList = [...chatLists.value];

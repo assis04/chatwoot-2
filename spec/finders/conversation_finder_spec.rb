@@ -33,6 +33,28 @@ describe ConversationFinder do
       end
     end
 
+    context 'with search query' do
+      let!(:ana) { create(:contact, account: account, name: 'Ananda Lopes', phone_number: '+5511973138202') }
+      let!(:old_format) { create(:contact, account: account, name: 'Sem Nono', phone_number: '+551173138202') }
+      let!(:ana_conversation) { create(:conversation, account: account, inbox: inbox, contact: ana, assignee: user_1) }
+      let!(:old_format_conversation) { create(:conversation, account: account, inbox: inbox, contact: old_format, assignee: user_1) }
+
+      it 'matches the contact name and nothing else' do
+        result = described_class.new(user_1, { q: 'ana', assignee_type: 'all' }).perform
+        expect(result[:conversations]).to contain_exactly(ana_conversation)
+      end
+
+      it 'matches a masked phone with and without the 9th digit' do
+        result = described_class.new(user_1, { q: '(11) 97313-8202', assignee_type: 'all' }).perform
+        expect(result[:conversations]).to contain_exactly(ana_conversation, old_format_conversation)
+      end
+
+      it 'treats LIKE wildcards in the term literally' do
+        result = described_class.new(user_1, { q: '%', assignee_type: 'all' }).perform
+        expect(result[:conversations]).to be_empty
+      end
+    end
+
     context 'with inbox' do
       let!(:restricted_conversation) { create(:conversation, account: account, inbox_id: restricted_inbox.id) }
 

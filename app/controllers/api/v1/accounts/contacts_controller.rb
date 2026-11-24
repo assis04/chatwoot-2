@@ -25,9 +25,13 @@ class Api::V1::Accounts::ContactsController < Api::V1::Accounts::BaseController
   def search
     render json: { error: 'Specify search string with parameter q' }, status: :unprocessable_entity if params[:q].blank? && return
 
+    term = params[:q].strip
+    conditions = 'name ILIKE :search OR email ILIKE :search OR phone_number ILIKE :search OR contacts.identifier LIKE :search'
+    # Fork Valcenter: telefone colado com mascara/sem DDI/sem o 9o digito (Contacts::PhoneSearchTerm).
+    phone_fragment = Contacts::PhoneSearchTerm.fragment(term)
+    conditions += ' OR contacts.phone_number LIKE :phone' if phone_fragment
     contacts = contact_visibility_scope(Current.account.contacts).where(
-      'name ILIKE :search OR email ILIKE :search OR phone_number ILIKE :search OR contacts.identifier LIKE :search',
-      search: "%#{params[:q].strip}%"
+      conditions, search: "%#{term}%", phone: "%#{phone_fragment}%"
     )
     @contacts = fetch_contacts_with_has_more(contacts)
   end

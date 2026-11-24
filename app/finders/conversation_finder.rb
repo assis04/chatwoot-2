@@ -157,7 +157,8 @@ class ConversationFinder
   end
 
   def filter_by_query
-    return unless params[:q]
+    term = params[:q].to_s.strip
+    return if term.blank?
 
     # Fork Valcenter: busca da lista de conversas NO SERVIDOR (antes era client-side,
     # que so filtrava as conversas ja carregadas -> com o default "Todas" virava um loop
@@ -167,14 +168,18 @@ class ConversationFinder
     # (resultado que "nao faz sentido"). contacts.name/phone_number tem indice GIN
     # trigram -> ILIKE '%termo%' e rapido. Tudo gated no q: sem busca, retorna cedo e
     # o fetch normal da lista nao muda. (Busca por conteudo = a busca global, Cmd+K.)
-    search = "%#{params[:q]}%"
+    # Telefone colado com mascara/sem DDI/sem o 9o digito: ver Contacts::PhoneSearchTerm.
+    # O front (helper/conversationSearch.js) espelha esta regra pra esconder da lista o
+    # que entra no store sem ter vindo da busca (conversa aberta, eventos em tempo real).
+    search = "%#{ActiveRecord::Base.sanitize_sql_like(term)}%"
     contacts = Contact.arel_table
-    @conversations = @conversations.joins(:contact).where(
-      contacts[:name].matches(search)
-        .or(contacts[:email].matches(search))
-        .or(contacts[:phone_number].matches(search))
-        .or(contacts[:identifier].matches(search))
-    )
+    condition = contacts[:name].matches(search)
+                               .or(contacts[:email].matches(search))
+                               .or(contacts[:phone_number].matches(search))
+                               .or(contacts[:identifier].matches(search))
+    phone_fragment = Contacts::PhoneSearchTerm.fragment(term)
+    condition = condition.or(contacts[:phone_number].matches("%#{phone_fragment}%")) if phone_fragment
+    @conversations = @conversations.joins(:contact).where(condition)
   end
 
   def filter_by_status
