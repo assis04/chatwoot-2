@@ -47,10 +47,14 @@ import {
 } from '../store/modules/conversations/helpers/actionHelpers';
 import {
   getUserPermissions,
+  getUserRole,
   filterItemsByPermission,
 } from 'dashboard/helper/permissionsHelper.js';
 import { matchesFilters } from '../store/modules/conversations/helpers/filterHelpers';
-import { conversationMatchesSearch } from 'dashboard/helper/conversationSearch';
+import {
+  canSeeInSearch,
+  conversationMatchesSearch,
+} from 'dashboard/helper/conversationSearch';
 import { CONVERSATION_EVENTS } from '../helper/AnalyticsHelper/events';
 import { ASSIGNEE_TYPE_TAB_PERMISSIONS } from 'dashboard/constants/permissions.js';
 
@@ -95,6 +99,14 @@ const clearSearch = () => {
 };
 
 const activeAssigneeTab = ref(wootConstants.ASSIGNEE_TYPE.ME);
+// Fork Valcenter: com termo de busca a lista vira uma busca em TUDO que o agente
+// pode ver — ignora a aba (Minhas/Nao atribuidas/Nao lidas), o status, a caixa, o
+// time, a etiqueta, a pasta e o tipo (mencoes/participando). Quem limita e a
+// permissao no servidor (PermissionFilterService). Limpou a busca, volta ao contexto.
+const isSearching = computed(() => Boolean(debouncedSearchQuery.value));
+const listAssigneeType = computed(() =>
+  isSearching.value ? wootConstants.ASSIGNEE_TYPE.ALL : activeAssigneeTab.value
+);
 // Fork Valcenter: default "Todas" (nao "Abertas") — os agentes nao percebiam
 // que o filtro vinha em Abertas e perdiam conversas resolvidas/pendentes.
 const activeStatus = ref(wootConstants.STATUS_TYPE.ALL);
@@ -115,6 +127,7 @@ const advancedFilterTypes = ref(
 );
 
 const currentUser = useMapGetter('getCurrentUser');
+const allConversations = useMapGetter('getAllConversations');
 const chatLists = useMapGetter('getFilteredConversations');
 const mineChatsList = useMapGetter('getMineChats');
 const allChatList = useMapGetter('getAllStatusChats');
@@ -190,6 +203,12 @@ const hasAppliedFiltersOrActiveFolders = computed(() => {
   return hasAppliedFilters.value || hasActiveFolders.value;
 });
 
+// Fork Valcenter: a lista so segue o filtro avancado/pasta quando NAO ha busca —
+// buscar dentro de uma pasta procura em tudo (ver isSearching).
+const isFilterOrFolderList = computed(() => {
+  return hasAppliedFiltersOrActiveFolders.value && !isSearching.value;
+});
+
 const currentUserDetails = computed(() => {
   const { id, name } = currentUser.value;
   return { id, name };
@@ -214,20 +233,18 @@ const assigneeTabItems = computed(() => {
 const showAssigneeInConversationCard = computed(() => {
   return (
     hasAppliedFiltersOrActiveFolders.value ||
-    activeAssigneeTab.value === wootConstants.ASSIGNEE_TYPE.ALL
+    listAssigneeType.value === wootConstants.ASSIGNEE_TYPE.ALL
   );
 });
 
 const currentPageFilterKey = computed(() => {
-  return hasAppliedFiltersOrActiveFolders.value
-    ? 'appliedFilters'
-    : activeAssigneeTab.value;
+  return isFilterOrFolderList.value ? 'appliedFilters' : listAssigneeType.value;
 });
 
 const inbox = useFunctionGetter('inboxes/getInbox', activeInbox);
 const currentPage = useFunctionGetter(
   'conversationPage/getCurrentPageFilter',
-  activeAssigneeTab
+  listAssigneeType
 );
 const currentFiltersPage = useFunctionGetter(
   'conversationPage/getCurrentPageFilter',
@@ -245,9 +262,9 @@ const conversationCustomAttributes = useFunctionGetter(
 
 const activeAssigneeTabCount = computed(() => {
   const count = assigneeTabItems.value.find(
-    item => item.key === activeAssigneeTab.value
-  ).count;
-  return count;
+    item => item.key === listAssigneeType.value
+  )?.count;
+  return count || 0;
 });
 
 const conversationListPagination = computed(() => {
@@ -257,7 +274,7 @@ const conversationListPagination = computed(() => {
     Array.isArray(chatsOnView.value) &&
     !chatsOnView.value.length;
   const isNoFiltersOrFoldersAndChatListNotEmpty =
-    !hasAppliedFiltersOrActiveFolders.value && hasChatsOnView;
+    !isFilterOrFolderList.value && hasChatsOnView;
   const isUnderPerPage =
     chatsOnView.value.length < conversationsPerPage &&
     activeAssigneeTabCount.value < conversationsPerPage &&
@@ -270,7 +287,25 @@ const conversationListPagination = computed(() => {
   return currentPage.value + 1;
 });
 
+// Fork Valcenter: as duas formas trazem TODAS as chaves — o store faz merge
+// (UPDATE_CHAT_LIST_FILTERS), entao uma chave ausente manteria o valor anterior
+// (a caixa continuaria valendo na busca, ou o termo depois de limpar a busca).
 const conversationFilters = computed(() => {
+  if (isSearching.value) {
+    // Busca server-side em tudo que o agente pode ver (o servidor ja ignora o
+    // status quando ha `q`; aqui saem a aba, a caixa, o time, a etiqueta e o tipo).
+    return {
+      inboxId: undefined,
+      assigneeType: wootConstants.ASSIGNEE_TYPE.ALL,
+      status: wootConstants.STATUS_TYPE.ALL,
+      sortBy: activeSortBy.value,
+      page: conversationListPagination.value,
+      labels: undefined,
+      teamId: undefined,
+      conversationType: undefined,
+      q: debouncedSearchQuery.value,
+    };
+  }
   return {
     inboxId: props.conversationInbox ? props.conversationInbox : undefined,
     assigneeType: activeAssigneeTab.value,
@@ -280,8 +315,7 @@ const conversationFilters = computed(() => {
     labels: props.label ? [props.label] : undefined,
     teamId: props.teamId || undefined,
     conversationType: props.conversationType || undefined,
-    // Fork Valcenter: termo de busca vai pro backend (server-side search).
-    q: debouncedSearchQuery.value || undefined,
+    q: undefined,
   };
 });
 
@@ -347,10 +381,26 @@ function sortByUnreadStatus(conversations) {
   });
 }
 
+const searchPermissionContext = computed(() => ({
+  role: getUserRole(currentUser.value, currentAccountId.value),
+  permissions: userPermissions.value,
+  userId: currentUser.value?.id,
+}));
+
 const conversationList = computed(() => {
   let localConversationList = [];
 
-  if (!hasAppliedFiltersOrActiveFolders.value) {
+  if (isSearching.value) {
+    // Fork Valcenter: busca em tudo que o agente pode ver. O store tambem guarda
+    // a conversa aberta e o que chega em tempo real (nao vieram da busca), entao a
+    // lista confere o termo e a mesma permissao do servidor (helper/conversationSearch.js).
+    const term = debouncedSearchQuery.value;
+    localConversationList = allConversations.value.filter(
+      conversation =>
+        conversationMatchesSearch(conversation, term) &&
+        canSeeInSearch(conversation, searchPermissionContext.value)
+    );
+  } else if (!hasAppliedFiltersOrActiveFolders.value) {
     const filters = conversationFilters.value;
     if (
       props.conversationType === wootConstants.CONVERSATION_TYPE.PARTICIPATING
@@ -366,41 +416,30 @@ const conversationList = computed(() => {
       // Aba "Não lidas": unread_count já vem por-agente do servidor. Mostra as não
       // lidas POR MIM que sejam sem dono OU minhas (espelha o filtro do servidor).
       // Some ao ser lida ou ao ser atribuída a outro agente.
-      localConversationList = allChatList.value(filters).filter(
-        chat =>
-          chat.unread_count > 0 &&
-          (!chat.meta?.assignee ||
-            chat.meta?.assignee?.id === currentUser.value?.id)
-      );
+      localConversationList = allChatList
+        .value(filters)
+        .filter(
+          chat =>
+            chat.unread_count > 0 &&
+            (!chat.meta?.assignee ||
+              chat.meta?.assignee?.id === currentUser.value?.id)
+        );
     } else {
       localConversationList = [...allChatList.value(filters)];
-    }
-    // Fork Valcenter: com busca ativa, so mostra o que casa com o termo. O store
-    // tambem guarda a conversa aberta e o que chega em tempo real, que nao vieram
-    // da busca do servidor (ver helper/conversationSearch.js).
-    if (filters.q) {
-      localConversationList = localConversationList.filter(conversation =>
-        conversationMatchesSearch(conversation, filters.q)
-      );
     }
   } else {
     localConversationList = [...chatLists.value];
   }
 
-  if (activeFolder.value) {
+  if (activeFolder.value && !isSearching.value) {
     const { payload } = activeFolder.value.query;
     localConversationList = localConversationList.filter(conversation => {
       return matchesFilters(conversation, payload);
     });
   }
 
-  // Fork Valcenter: a busca agora e SERVER-SIDE (via `q` em conversationFilters ->
-  // backend filter_by_query). O filtro client-side foi removido porque, com o default
-  // "Todas", ele so via as conversas ja carregadas e forcava paginacao infinita ate
-  // varrer a lista inteira. O watch de debouncedSearchQuery refaz o fetch no servidor.
-
   if (
-    !hasAppliedFiltersOrActiveFolders.value &&
+    !isFilterOrFolderList.value &&
     activeSortBy.value === wootConstants.SORT_BY_TYPE.UNREAD
   ) {
     localConversationList = sortByUnreadStatus(localConversationList);
@@ -636,6 +675,11 @@ function resetAndFetchData() {
   store.dispatch('conversationPage/reset');
   store.dispatch('emptyAllConversations');
   store.dispatch('clearConversationFilters');
+  // Fork Valcenter: com busca, ate dentro de uma pasta, procura em tudo.
+  if (isSearching.value) {
+    fetchConversations();
+    return;
+  }
   if (hasActiveFolders.value) {
     const payload = activeFolder.value.query;
     fetchSavedFilteredConversations(payload);
@@ -651,7 +695,7 @@ function loadMoreConversations() {
     return;
   }
 
-  if (!hasAppliedFiltersOrActiveFolders.value) {
+  if (!isFilterOrFolderList.value) {
     fetchConversations();
   } else if (hasActiveFolders.value) {
     const payload = activeFolder.value.query;
@@ -862,7 +906,7 @@ function toggleSelectAll(check) {
 }
 
 useEmitter('fetch_conversation_stats', () => {
-  if (hasAppliedFiltersOrActiveFolders.value) return;
+  if (isFilterOrFolderList.value) return;
   store.dispatch('conversationStats/get', conversationFilters.value);
 });
 
@@ -988,8 +1032,16 @@ watch(debouncedSearchQuery, () => {
       @close="onCloseDeleteFoldersModal"
     />
 
+    <!-- Fork Valcenter: durante a busca as abas nao filtram — o aviso diz onde a busca procura. -->
+    <p
+      v-if="isSearching"
+      class="mx-4 mt-3 mb-0 text-xs text-n-slate-11"
+      role="status"
+    >
+      {{ $t('CHAT_LIST.SEARCH_SCOPE_ALL') }}
+    </p>
     <ChatTypeTabs
-      v-if="!hasAppliedFiltersOrActiveFolders"
+      v-else-if="!hasAppliedFiltersOrActiveFolders"
       :items="assigneeTabItems"
       :active-tab="activeAssigneeTab"
       is-compact
@@ -1008,7 +1060,7 @@ watch(debouncedSearchQuery, () => {
       <input
         :value="searchQuery"
         type="text"
-        placeholder="Buscar conversas"
+        :placeholder="$t('CHAT_LIST.SEARCH_PLACEHOLDER')"
         class="flex-1 bg-transparent border-0 outline-none text-sm text-n-slate-12 placeholder:text-n-slate-10 min-w-0"
         @input="onSearchInput"
       />
@@ -1016,7 +1068,7 @@ watch(debouncedSearchQuery, () => {
         v-if="searchQuery"
         type="button"
         class="flex-shrink-0 text-n-slate-10 hover:text-n-slate-12 transition-colors"
-        aria-label="Limpar busca"
+        :aria-label="$t('CHAT_LIST.SEARCH_CLEAR')"
         @click="clearSearch"
       >
         <fluent-icon icon="dismiss-circle" size="14" />

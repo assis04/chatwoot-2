@@ -1,4 +1,5 @@
 import {
+  canSeeInSearch,
   conversationMatchesSearch,
   phoneSearchFragment,
 } from '../conversationSearch';
@@ -57,5 +58,58 @@ describe('conversationMatchesSearch', () => {
 
   it('does not match a conversation without sender data', () => {
     expect(conversationMatchesSearch({ id: 2 }, 'ana')).toBe(false);
+  });
+});
+
+describe('canSeeInSearch', () => {
+  const me = 7;
+  const conv = (assigneeId, participantIds = []) => ({
+    meta: {
+      assignee: assigneeId ? { id: assigneeId } : null,
+      participants: participantIds.map(id => ({ id })),
+    },
+  });
+  const customRole = permissions => ({
+    role: 'custom_role',
+    permissions,
+    userId: me,
+  });
+
+  it('lets administrators and plain agents see everything the server sent', () => {
+    ['administrator', 'agent'].forEach(role => {
+      expect(
+        canSeeInSearch(conv(99), { role, permissions: [], userId: me })
+      ).toBe(true);
+    });
+  });
+
+  it('lets conversation_manage see conversations of other agents', () => {
+    expect(canSeeInSearch(conv(99), customRole(['conversation_manage']))).toBe(
+      true
+    );
+  });
+
+  it('limits unassigned_manage to unassigned and own conversations', () => {
+    const role = customRole([
+      'conversation_unassigned_manage',
+      'conversation_participating_manage',
+    ]);
+    expect(canSeeInSearch(conv(null), role)).toBe(true);
+    expect(canSeeInSearch(conv(me), role)).toBe(true);
+    expect(canSeeInSearch(conv(99, [me]), role)).toBe(false);
+  });
+
+  it('lets participating_manage find conversations they took part in', () => {
+    const role = customRole(['conversation_participating_manage']);
+    expect(canSeeInSearch(conv(me), role)).toBe(true);
+    expect(canSeeInSearch(conv(null, [me, 3]), role)).toBe(true);
+    expect(canSeeInSearch(conv(null, [3]), role)).toBe(false);
+    expect(canSeeInSearch(conv(99), role)).toBe(false);
+  });
+
+  it('hides everything from a custom role without conversation permissions', () => {
+    expect(canSeeInSearch(conv(me), customRole(['contact_manage']))).toBe(
+      false
+    );
   });
 });

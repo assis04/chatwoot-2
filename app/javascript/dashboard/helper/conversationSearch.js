@@ -27,6 +27,30 @@ export const phoneSearchFragment = term => {
     : digits;
 };
 
+// Fork Valcenter: a busca procura em TUDO que o agente pode ver, sem a aba, a
+// caixa ou o status. Quem decide e o Conversations::PermissionFilterService; isto
+// espelha a mesma hierarquia (manage > unassigned_manage > participating_manage),
+// inclusive a participacao, para a busca achar a conversa que o agente atendeu e
+// que perdeu o dono ao ser resolvida. A lista normal continua no applyRoleFilter.
+export const canSeeInSearch = (conversation, { role, permissions, userId }) => {
+  if (['administrator', 'agent'].includes(role)) return true;
+  if (permissions.includes('conversation_manage')) return true;
+
+  const assigneeId = conversation?.meta?.assignee?.id;
+  const isMine = assigneeId === userId;
+
+  if (permissions.includes('conversation_unassigned_manage')) {
+    return !assigneeId || isMine;
+  }
+  if (permissions.includes('conversation_participating_manage')) {
+    const participants = conversation?.meta?.participants || [];
+    return (
+      isMine || participants.some(participant => participant.id === userId)
+    );
+  }
+  return false;
+};
+
 export const conversationMatchesSearch = (conversation, term) => {
   const needle = String(term || '')
     .trim()
