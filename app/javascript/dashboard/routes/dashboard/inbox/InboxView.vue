@@ -14,8 +14,11 @@ import ConversationBox from 'dashboard/components/widgets/conversation/Conversat
 import InboxEmptyState from './InboxEmptyState.vue';
 import Spinner from 'dashboard/components-next/spinner/Spinner.vue';
 import ConversationSidebar from 'dashboard/components/widgets/conversation/ConversationSidebar.vue';
+import ConversationSearchPanel from 'dashboard/components/widgets/conversation/search/ConversationSearchPanel.vue';
+import { useConversationSearch } from 'dashboard/composables/useConversationSearch';
 
 const route = useRoute();
+const { isOpen: isConversationSearchOpen } = useConversationSearch();
 const router = useRouter();
 const store = useStore();
 const { uiSettings } = useUISettings();
@@ -214,8 +217,13 @@ onMounted(async () => {
         >
           <SidepanelSwitch v-if="currentChat.id" />
         </ConversationBox>
+        <!-- Fork Valcenter: a busca na conversa ocupa o lugar do painel do contato. -->
+        <ConversationSearchPanel
+          v-if="currentChat.id && isConversationSearchOpen"
+          :current-chat="currentChat"
+        />
         <ConversationSidebar
-          v-if="isContactPanelOpen"
+          v-else-if="isContactPanelOpen"
           :current-chat="currentChat"
         />
       </div>

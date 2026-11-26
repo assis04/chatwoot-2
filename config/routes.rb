@@ -152,6 +152,10 @@ Rails.application.routes.draw do
             end
             scope module: :conversations do
               resources :messages, only: [:index, :create, :destroy, :update] do
+                # Fork Valcenter: busca dentro da conversa (lupa no cabecalho).
+                collection do
+                  get :search
+                end
                 member do
                   post :translate
                   post :retry

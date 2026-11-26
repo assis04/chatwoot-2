@@ -21,6 +21,10 @@ import {
 } from 'dashboard/helper/voice';
 
 const pendingHistoryRequests = new Map();
+// Fork Valcenter: MessageFinder#messages_between devolve no maximo 1000 por vez;
+// 20 lotes = 20 mil mensagens entre o alvo e o que ja esta na tela.
+const MESSAGES_BETWEEN_LIMIT = 1000;
+const MAX_JUMP_BATCHES = 20;
 
 export const hasMessageFailedWithExternalError = pendingMessage => {
   // This helper is used to check if the message has failed with an external error.
@@ -158,6 +162,52 @@ const actions = {
 
     pendingHistoryRequests.set(requestKey, request);
     return request;
+  },
+
+  // Fork Valcenter: garante que `messageId` esteja carregada na conversa aberta
+  // (busca dentro da conversa). Carrega do alvo ate a mensagem mais antiga ja
+  // carregada, em lotes do MessageFinder#messages_between (limite do servidor), e
+  // grava TUDO de uma vez: SET_PREVIOUS_CONVERSATIONS faz unshift, entao lotes
+  // gravados separados inverteriam a ordem. Se nao fechar o intervalo, nao grava
+  // nada (melhor nao pular do que deixar um buraco no meio do historico).
+  loadMessagesUntil: async (
+    { commit, state },
+    { conversationId, messageId }
+  ) => {
+    const chat = state.allConversations.find(c => c.id === conversationId);
+    if (!chat) return false;
+    if (chat.messages.some(message => message.id === messageId)) return true;
+
+    const oldestId = chat.messages[0]?.id;
+    if (!oldestId || messageId >= oldestId) return false;
+
+    const loaded = [];
+    let after = messageId;
+    let lastMeta = null;
+    for (let batch = 0; batch < MAX_JUMP_BATCHES; batch += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      const { data } = await MessageApi.getPreviousMessages({
+        conversationId,
+        after,
+        before: oldestId,
+      });
+      loaded.push(...data.payload);
+      lastMeta = data.meta;
+      if (data.payload.length < MESSAGES_BETWEEN_LIMIT) {
+        loaded.sort((a, b) => a.created_at - b.created_at || a.id - b.id);
+        commit(`conversationMetadata/${types.SET_CONVERSATION_METADATA}`, {
+          id: conversationId,
+          data: lastMeta,
+        });
+        commit(types.SET_PREVIOUS_CONVERSATIONS, {
+          id: conversationId,
+          data: loaded,
+        });
+        return loaded.some(message => message.id === messageId);
+      }
+      after = Math.max(...data.payload.map(message => message.id)) + 1;
+    }
+    return false;
   },
 
   fetchAllAttachments: async ({ commit }, conversationId) => {

@@ -986,3 +986,80 @@ describe('#addMentions', () => {
     });
   });
 });
+
+// Fork Valcenter: pular para uma mensagem da busca dentro da conversa.
+describe('#loadMessagesUntil', () => {
+  const message = (id, createdAt = id) => ({ id, created_at: createdAt });
+  const stateWith = messageIds => ({
+    allConversations: [{ id: 1, messages: messageIds.map(id => message(id)) }],
+  });
+
+  beforeEach(() => {
+    commit.mockClear();
+    axios.get.mockReset();
+  });
+
+  it('does not fetch when the message is already loaded', async () => {
+    const found = await actions.loadMessagesUntil(
+      { commit, state: stateWith([50, 51]) },
+      { conversationId: 1, messageId: 51 }
+    );
+    expect(found).toBe(true);
+    expect(axios.get).not.toHaveBeenCalled();
+  });
+
+  it('loads from the target up to the oldest loaded message in one commit', async () => {
+    axios.get.mockResolvedValueOnce({
+      data: { meta: { contact: {} }, payload: [message(10), message(11)] },
+    });
+
+    const found = await actions.loadMessagesUntil(
+      { commit, state: stateWith([50]) },
+      { conversationId: 1, messageId: 10 }
+    );
+
+    expect(found).toBe(true);
+    expect(axios.get.mock.calls[0][1]).toEqual({
+      params: { before: 50, after: 10 },
+    });
+    expect(commit).toHaveBeenCalledWith(types.SET_PREVIOUS_CONVERSATIONS, {
+      id: 1,
+      data: [message(10), message(11)],
+    });
+  });
+
+  it('pages through more than one batch and keeps chronological order', async () => {
+    const firstBatch = Array.from({ length: 1000 }, (_, index) =>
+      message(index + 10)
+    );
+    axios.get
+      .mockResolvedValueOnce({ data: { meta: {}, payload: firstBatch } })
+      .mockResolvedValueOnce({ data: { meta: {}, payload: [message(1010)] } });
+
+    const found = await actions.loadMessagesUntil(
+      { commit, state: stateWith([2000]) },
+      { conversationId: 1, messageId: 10 }
+    );
+
+    expect(found).toBe(true);
+    expect(axios.get.mock.calls[1][1]).toEqual({
+      params: { before: 2000, after: 1010 },
+    });
+    const committed = commit.mock.calls.find(
+      ([type]) => type === types.SET_PREVIOUS_CONVERSATIONS
+    )[1].data;
+    expect(committed).toHaveLength(1001);
+    expect(committed[0].id).toBe(10);
+    expect(committed[1000].id).toBe(1010);
+  });
+
+  it('gives up without fetching when the target is newer than the loaded history', async () => {
+    const found = await actions.loadMessagesUntil(
+      { commit, state: stateWith([50]) },
+      { conversationId: 1, messageId: 99 }
+    );
+    expect(found).toBe(false);
+    expect(axios.get).not.toHaveBeenCalled();
+    expect(commit).not.toHaveBeenCalled();
+  });
+});

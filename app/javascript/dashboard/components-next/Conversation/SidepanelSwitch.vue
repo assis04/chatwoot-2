@@ -6,8 +6,13 @@ import { computed } from 'vue';
 import { FEATURE_FLAGS } from 'dashboard/featureFlags';
 import { useMapGetter } from 'dashboard/composables/store';
 import { useKeyboardEvents } from 'dashboard/composables/useKeyboardEvents';
+import { useConversationSearch } from 'dashboard/composables/useConversationSearch';
 
 const { updateUISettings } = useUISettings();
+// Fork Valcenter: a busca na conversa usa o mesmo espaco; abrir contato ou
+// copiloto fecha a busca.
+const { isOpen: isConversationSearchOpen, close: closeConversationSearch } =
+  useConversationSearch();
 
 const currentAccountId = useMapGetter('getCurrentAccountId');
 const isFeatureEnabledonAccount = useMapGetter(
@@ -20,13 +25,15 @@ const showCopilotTab = computed(() =>
 
 const { uiSettings } = useUISettings();
 const isContactSidebarOpen = computed(
-  () => uiSettings.value.is_contact_sidebar_open
+  () =>
+    uiSettings.value.is_contact_sidebar_open && !isConversationSearchOpen.value
 );
 const isCopilotPanelOpen = computed(
   () => uiSettings.value.is_copilot_panel_open
 );
 
 const toggleConversationSidebarToggle = () => {
+  closeConversationSearch();
   updateUISettings({
     is_contact_sidebar_open: !isContactSidebarOpen.value,
     is_copilot_panel_open: false,
@@ -34,6 +41,7 @@ const toggleConversationSidebarToggle = () => {
 };
 
 const handleConversationSidebarToggle = () => {
+  closeConversationSearch();
   updateUISettings({
     is_contact_sidebar_open: true,
     is_copilot_panel_open: false,
@@ -41,6 +49,7 @@ const handleConversationSidebarToggle = () => {
 };
 
 const handleCopilotSidebarToggle = () => {
+  closeConversationSearch();
   updateUISettings({
     is_contact_sidebar_open: false,
     is_copilot_panel_open: true,

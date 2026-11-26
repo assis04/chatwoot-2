@@ -99,6 +99,23 @@
       "TRANSCRIPT_SHOW_MORE": "Ver mais",
       "TRANSCRIPT_SHOW_LESS": "Mostrar menos"
     },
+    "SEARCH_IN_CONVERSATION": {
+      "BUTTON_TOOLTIP": "Buscar na conversa (Ctrl+Shift+F)",
+      "TITLE": "Buscar na conversa",
+      "PLACEHOLDER": "Palavra, número ou nome de arquivo",
+      "CLOSE": "Fechar busca",
+      "CLEAR": "Limpar busca",
+      "HINT": "Digite pelo menos 2 letras para buscar em toda a conversa",
+      "SEARCHING": "Buscando…",
+      "RESULTS": "{count} mensagem encontrada | {count} mensagens encontradas",
+      "EMPTY": "Nenhuma mensagem encontrada",
+      "ERROR": "Não foi possível buscar agora. Tente de novo.",
+      "JUMP_ERROR": "Não foi possível abrir essa mensagem na conversa.",
+      "NOTE": "Nota privada",
+      "LOAD_MORE": "Carregar mais",
+      "CONTACT_FALLBACK": "Cliente",
+      "TEAM_FALLBACK": "Equipe"
+    },
     "HEADER": {
       "RESOLVE_ACTION": "Resolver",
       "REOPEN_ACTION": "Reabrir",

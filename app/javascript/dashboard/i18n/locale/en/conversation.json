@@ -111,6 +111,23 @@
       "TRANSCRIPT_SHOW_MORE": "Show more",
       "TRANSCRIPT_SHOW_LESS": "Show less"
     },
+    "SEARCH_IN_CONVERSATION": {
+      "BUTTON_TOOLTIP": "Search in conversation (Ctrl+Shift+F)",
+      "TITLE": "Search in conversation",
+      "PLACEHOLDER": "Word, number or file name",
+      "CLOSE": "Close search",
+      "CLEAR": "Clear search",
+      "HINT": "Type at least 2 characters to search the whole conversation",
+      "SEARCHING": "Searching…",
+      "RESULTS": "{count} message found | {count} messages found",
+      "EMPTY": "No messages found",
+      "ERROR": "Search is unavailable right now. Try again.",
+      "JUMP_ERROR": "Could not open this message in the conversation.",
+      "NOTE": "Private note",
+      "LOAD_MORE": "Load more",
+      "CONTACT_FALLBACK": "Customer",
+      "TEAM_FALLBACK": "Team"
+    },
     "HEADER": {
       "RESOLVE_ACTION": "Resolve",
       "REOPEN_ACTION": "Reopen",

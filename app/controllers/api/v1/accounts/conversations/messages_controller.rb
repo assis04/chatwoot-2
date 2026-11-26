@@ -5,6 +5,12 @@ class Api::V1::Accounts::Conversations::MessagesController < Api::V1::Accounts::
     @messages = message_finder.perform
   end
 
+  # Fork Valcenter: busca dentro da conversa. Autorizacao = acesso a conversa
+  # (BaseController faz authorize :show?), igual ao index.
+  def search
+    @search = Messages::ConversationSearchService.new(@conversation, params[:q], page: params[:page]).perform
+  end
+
   def create
     user = Current.user || @resource
     mb = Messages::MessageBuilder.new(user, @conversation, params)

@@ -211,6 +211,43 @@ RSpec.describe 'Conversation Messages API', type: :request do
     end
   end
 
+  # Fork Valcenter: busca dentro da conversa.
+  describe 'GET /api/v1/accounts/{account.id}/conversations/:id/messages/search' do
+    let(:conversation) { create(:conversation, account: account) }
+    let(:search_path) { "/api/v1/accounts/#{account.id}/conversations/#{conversation.display_id}/messages/search" }
+
+    before do
+      create(:message, account: account, conversation: conversation, inbox: conversation.inbox, content: 'Segue o orçamento')
+      create(:message, account: account, conversation: conversation, inbox: conversation.inbox, content: 'bom dia')
+    end
+
+    it 'returns unauthorized for unauthenticated users' do
+      get search_path, params: { q: 'orcamento' }
+
+      expect(response).to have_http_status(:unauthorized)
+    end
+
+    it 'returns unauthorized for an agent without access to the conversation' do
+      outsider = create(:user, account: account, role: :agent)
+
+      get search_path, params: { q: 'orcamento' }, headers: outsider.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:unauthorized)
+    end
+
+    it 'returns the matching messages for an agent with access' do
+      agent = create(:user, account: account, role: :agent)
+      create(:inbox_member, inbox: conversation.inbox, user: agent)
+
+      get search_path, params: { q: 'orcamento' }, headers: agent.create_new_auth_token, as: :json
+
+      expect(response).to have_http_status(:success)
+      body = response.parsed_body
+      expect(body['meta']).to eq('total' => 1, 'has_more' => false)
+      expect(body['payload'].pluck('content')).to eq(['Segue o orçamento'])
+    end
+  end
+
   describe 'DELETE /api/v1/accounts/{account.id}/conversations/:conversation_id/messages/:id' do
     let(:message) { create(:message, account: account, content_attributes: { bcc_emails: ['hello@chatwoot.com'] }) }
     let(:conversation) { message.conversation }

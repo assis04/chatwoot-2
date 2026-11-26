@@ -10,6 +10,8 @@ import CmdBarConversationSnooze from 'dashboard/routes/dashboard/commands/CmdBar
 import { emitter } from 'shared/helpers/mitt';
 import SidepanelSwitch from 'dashboard/components-next/Conversation/SidepanelSwitch.vue';
 import ConversationSidebar from 'dashboard/components/widgets/conversation/ConversationSidebar.vue';
+import ConversationSearchPanel from 'dashboard/components/widgets/conversation/search/ConversationSearchPanel.vue';
+import { useConversationSearch } from 'dashboard/composables/useConversationSearch';
 
 export default {
   components: {
@@ -18,6 +20,7 @@ export default {
     CmdBarConversationSnooze,
     SidepanelSwitch,
     ConversationSidebar,
+    ConversationSearchPanel,
   },
   beforeRouteLeave(to, from, next) {
     // Clear selected state if navigating away from a conversation to a route without a conversationId to prevent stale data issues
@@ -56,11 +59,13 @@ export default {
   setup() {
     const { uiSettings, updateUISettings } = useUISettings();
     const { accountId } = useAccount();
+    const { isOpen: isConversationSearchOpen } = useConversationSearch();
 
     return {
       uiSettings,
       updateUISettings,
       accountId,
+      isConversationSearchOpen,
     };
   },
   data() {
@@ -213,7 +218,15 @@ export default {
     >
       <SidepanelSwitch v-if="currentChat.id" />
     </ConversationBox>
-    <ConversationSidebar v-if="shouldShowSidebar" :current-chat="currentChat" />
+    <!-- Fork Valcenter: a busca na conversa ocupa o lugar do painel do contato. -->
+    <ConversationSearchPanel
+      v-if="currentChat.id && isConversationSearchOpen"
+      :current-chat="currentChat"
+    />
+    <ConversationSidebar
+      v-else-if="shouldShowSidebar"
+      :current-chat="currentChat"
+    />
     <CmdBarConversationSnooze />
   </section>
 </template>
